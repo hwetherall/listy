@@ -1,12 +1,12 @@
 // List of LLM models to query
 const LLM_MODELS = [
-    'google/gemini-2.5-pro-exp-03-25:free',
+    // 'google/gemini-2.5-pro-exp-03-25:free', // Removed due to consistent errors
     'deepseek/deepseek-chat-v3-0324:free',
     'openai/gpt-4o-search-preview',
     'anthropic/claude-3.7-sonnet',
     'x-ai/grok-2-1212',
     'cohere/command-r7b-12-2024',
-    'qwen/qwq-32b:free',
+    // 'qwen/qwq-32b:free', // Removed due to slowness
     'mistralai/mistral-small-3.1-24b-instruct:free',
     'nvidia/llama-3.1-nemotron-70b-instruct:free'
   ];
@@ -78,6 +78,19 @@ const LLM_MODELS = [
       }
   
       const data = await response.json();
+      
+      // Add check for valid choices array
+      if (!data.choices || data.choices.length === 0 || !data.choices[0].message || !data.choices[0].message.content) {
+        const errorMessage = `Invalid response structure from ${model}: Missing expected content.`;
+        console.error(`Error querying ${model}:`, errorMessage, data); // Log the actual data received
+        updateProgress(model, 'error');
+        return {
+          model,
+          error: errorMessage,
+          content: null
+        };
+      }
+
       updateProgress(model, 'success');
       
       return {

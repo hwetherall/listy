@@ -2,8 +2,9 @@
 const API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY;
 const BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
-// Use the most powerful free model for normalization
-const NORMALIZER_MODEL = 'google/gemini-2.5-pro-exp-03-25:free';
+// Use a different free model for normalization as Google model was causing errors
+// Trying Mistral Small for potentially better speed
+const NORMALIZER_MODEL = 'mistralai/mistral-small-3.1-24b-instruct:free';
 
 /**
  * Generate prompt for normalization
@@ -106,11 +107,25 @@ export const normalizeResults = async (results) => {
     }
 
     const data = await response.json();
+
+    // Add check for valid choices array
+    if (!data.choices || data.choices.length === 0 || !data.choices[0].message || !data.choices[0].message.content) {
+      const errorMessage = `Invalid response structure from normalizer model (${NORMALIZER_MODEL}): Missing expected content.`;
+      console.error('Normalization error:', errorMessage, data); // Log the actual data received
+      throw new Error(errorMessage);
+    }
+
     const content = data.choices[0].message.content;
     
+    // Log the raw content before parsing
+    console.log("Raw content from normalizer:", content); 
+
     // Extract and parse the JSON from the response
     const normalizationMap = extractJsonFromResponse(content);
     
+    // Log the parsed normalization map
+    console.log("Parsed Normalization Map:", normalizationMap);
+
     // Apply normalization to all results
     const normalizedResults = {};
     
