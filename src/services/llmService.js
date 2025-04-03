@@ -8,7 +8,9 @@ const LLM_MODELS = [
     'cohere/command-r7b-12-2024',
     // 'qwen/qwq-32b:free', // Removed due to slowness
     'mistralai/mistral-small-3.1-24b-instruct:free',
-    'nvidia/llama-3.1-nemotron-70b-instruct:free'
+    'nvidia/llama-3.1-nemotron-70b-instruct:free',
+    'perplexity/sonar-pro',
+    'google/gemma-3-27b-it'
   ];
   
   // Get API key from environment variables

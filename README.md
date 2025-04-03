@@ -26,6 +26,8 @@ Listy is a React application that helps you create short, consensus-based lists 
 - qwen/qwq-32b:free
 - mistralai/mistral-small-3.1-24b-instruct:free
 - nvidia/llama-3.1-nemotron-70b-instruct:free
+- perplexity/sonar-deep-research
+- google/gemma-3-27b-it
 
 ## Getting Started
 
