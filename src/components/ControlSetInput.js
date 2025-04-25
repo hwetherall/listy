@@ -7,6 +7,16 @@ function ControlSetInput({ onSave }) {
   const [newCompetitor, setNewCompetitor] = useState('');
   const [isCollapsed, setIsCollapsed] = useState(false);
 
+  // Reset state when component receives new props (when controlSet is reset)
+  useEffect(() => {
+    // Check if the component needs resetting (when onSave changes reference)
+    if (!isCollapsed) {
+      setRawInput('');
+      setCompetitors([]);
+      setIsParsed(false);
+    }
+  }, [onSave]);
+
   // Parse the input into competitors
   const parseInput = () => {
     if (!rawInput.trim()) return;
@@ -32,14 +42,16 @@ function ControlSetInput({ onSave }) {
   // Add a new competitor manually
   const addCompetitor = () => {
     if (newCompetitor.trim()) {
-      setCompetitors([...competitors, newCompetitor.trim()]);
+      const updatedCompetitors = [...competitors, newCompetitor.trim()];
+      setCompetitors(updatedCompetitors);
       setNewCompetitor('');
     }
   };
 
   // Remove a competitor
   const removeCompetitor = (index) => {
-    setCompetitors(competitors.filter((_, i) => i !== index));
+    const updatedCompetitors = competitors.filter((_, i) => i !== index);
+    setCompetitors(updatedCompetitors);
   };
 
   if (isCollapsed) {
@@ -142,6 +154,7 @@ Voi"
               type="button"
               onClick={handleSave}
               className="save-button"
+              disabled={competitors.length === 0}
             >
               Save Control Set
             </button>

@@ -1177,6 +1177,41 @@
     border: 1px solid var(--neutral-200);
   }
   
+  .control-set-input.collapsed {
+    padding: var(--space-4);
+  }
+  
+  .collapsed-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .collapsed-header h3 {
+    margin: 0;
+    font-size: 1rem;
+  }
+  
+  .expand-button {
+    background-color: var(--neutral-100);
+    color: var(--primary);
+    border: 1px solid var(--neutral-300);
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition-fast);
+  }
+  
+  .expand-button:hover {
+    background-color: var(--neutral-200);
+    border-color: var(--primary-light);
+  }
+  
+  .control-set-container {
+    margin-bottom: var(--space-6);
+  }
+  
   .input-helper-text {
     color: var(--neutral-600);
     font-size: 0.875rem;
@@ -1551,4 +1586,44 @@
 
 .new-company-button:hover {
   background-color: var(--primary-dark);
+}
+
+.description-field-container {
+  position: relative;
+  display: flex;
+}
+
+.description-field {
+  flex: 1;
+}
+
+.generate-description-button {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background-color: var(--primary-light);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.generate-description-button:hover:not(:disabled) {
+  background-color: var(--primary);
+}
+
+.generate-description-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.generate-description-button svg {
+  width: 14px;
+  height: 14px;
 }

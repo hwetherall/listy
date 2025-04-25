@@ -3,7 +3,6 @@ import InputForm from './components/InputForm';
 import LoadingIndicator from './components/LoadingIndicator';
 import ResultsTable from './components/ResultsTable';
 import ErrorDisplay from './components/ErrorDisplay';
-import ControlSetInput from './components/ControlSetInput';
 import ControlSetEvaluation from './components/ControlSetEvaluation';
 import { queryLLMs } from './services/llmService';
 import { normalizeResults } from './services/normalizationService';
@@ -34,16 +33,25 @@ function App() {
       const competitorCount = controlSet.competitors.length;
       setShortListCount(competitorCount);
       setLongListCount(Math.ceil(competitorCount * 1.5)); // 50% more
+    } else if (testMode && (!controlSet || !controlSet.competitors || controlSet.competitors.length === 0)) {
+      // Reset to default values if there are no competitors in test mode
+      setShortListCount(10);
+      setLongListCount(20);
     }
   }, [controlSet, testMode]);
 
   // Submit handler - Query all LLMs
-  const handleSubmit = async () => {
+  const handleSubmit = async (controlSetData) => {
     setIsLoading(true);
     setError(null);
     setRawResults(null);
     setNormalizedResults(null);
     setProgress({});
+    
+    // Update control set if provided from the form
+    if (controlSetData) {
+      setControlSet(controlSetData);
+    }
     
     try {
       const results = await queryLLMs(
@@ -115,55 +123,104 @@ function App() {
       setIsNormalizing(false);
     }
   };
-  
-  // Handler for saving control set
-  const handleSaveControlSet = (data) => {
-    setControlSet(data);
-  };
 
   // Add a function to handle starting a new company
   const handleNewCompany = () => {
     // Only proceed if we have normalized results
     if (!normalizedResults || !input) return;
-    
+
     // Extract precision and recall metrics if available
     let metrics = {
       precision: 'N/A',
       recall: 'N/A'
     };
-    
+
     // If we're in test mode and have a control set, use the evaluation metrics
-    if (testMode && controlSet && normalizedResults && normalizedResults.normalizedControlSet) {
-      const shortListMatches = normalizedResults.summary.filter(item => 
-        normalizedResults.normalizedControlSet.competitors.includes(item.item)
-      ).length;
-      
-      const precision = shortListMatches / normalizedResults.summary.length;
-      const recall = shortListMatches / controlSet.competitors.length;
-      
+    if (testMode && controlSet && normalizedResults && normalizedResults.normalizedControlSet && controlSet.competitors.length > 0) {
+
+      const originalControlSetCompetitors = new Set(controlSet.competitors);
+      const normalizedControlSetCompetitors = new Set(normalizedResults.normalizedControlSet.competitors);
+
+      // --- Precision Calculation (Checks normalized control set against short list) ---
+      const shortListItems = new Set(normalizedResults.summary.map(item => item.item));
+      let precisionMatches = 0;
+      shortListItems.forEach(item => {
+        if (normalizedControlSetCompetitors.has(item)) {
+          precisionMatches++;
+        }
+      });
+      // Ensure denominator is not zero
+      const precision = normalizedResults.summary.length > 0
+        ? precisionMatches / normalizedResults.summary.length
+        : 0;
+
+      // --- Recall Calculation (Checks normalized control set against *all* normalized found items) ---
+      // Get all unique *normalized* items found by any LLM from rawData
+      const allFoundNormalizedItems = new Set();
+      Object.values(normalizedResults.rawData).forEach(modelResult => {
+        if (modelResult && modelResult.items) {
+          modelResult.items.forEach(item => {
+            if (item) allFoundNormalizedItems.add(item.trim()); // These are already normalized
+          });
+        }
+      });
+
+      // Count how many *normalized* control set competitors are in the *all found normalized* items list
+      let recallMatches = 0;
+      normalizedControlSetCompetitors.forEach(normalizedControlCompetitor => {
+        if (allFoundNormalizedItems.has(normalizedControlCompetitor)) {
+          recallMatches++;
+        }
+      });
+
+      // Recall = total matches found / total number of *original* control set items
+      // Ensure denominator is not zero
+      const recall = originalControlSetCompetitors.size > 0
+         ? recallMatches / originalControlSetCompetitors.size
+         : 0;
+
+      // Format both metrics as percentages
       metrics = {
         precision: Math.round(precision * 100) + '%',
         recall: Math.round(recall * 100) + '%'
       };
+
+      console.log('Debug metrics calculation (Final Logic):', {
+        precisionMatches: precisionMatches,
+        shortlistLength: normalizedResults.summary.length,
+        recallMatches: recallMatches,
+        originalControlSetLength: originalControlSetCompetitors.size,
+        calculatedPrecision: precision,
+        calculatedRecall: recall,
+        formattedMetrics: metrics
+      });
     }
-    
+
     // Save current company data
     setPreviousCompanies(prev => [...prev, {
       name: input,
       description: companyDescription,
       timestamp: new Date().toLocaleString(),
       testMode,
-      metrics
+      metrics // Use the calculated metrics
     }]);
-    
+
     // Reset form for a new company
     setInput('');
     setCompanyDescription('');
     setRawResults(null);
     setNormalizedResults(null);
     setProgress({});
-    
-    // Keep testMode and control set intact for continued testing
+
+    // Reset control set for new company
+    setControlSet(null);
+
+    // Reset to default list counts
+    if (!testMode) {
+      setLongListCount(20);
+      setShortListCount(10);
+    }
+
     // Scroll to top of page
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -192,11 +249,6 @@ function App() {
         onSubmit={handleSubmit}
         isLoading={isLoading}
       />
-      
-      {/* Only show Control Set Input in test mode */}
-      {testMode && (
-        <ControlSetInput onSave={handleSaveControlSet} />
-      )}
         
         {isLoading && (
           <LoadingIndicator 

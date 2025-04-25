@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { generateCompanyDescription } from '../services/descriptionService';
+import ControlSetInput from './ControlSetInput';
 
 function InputForm({
   input,
@@ -16,9 +18,39 @@ function InputForm({
   onSubmit,
   isLoading
 }) {
+  const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
+  const [controlSetData, setControlSetData] = useState(null);
+  
+  // Reset control set data when input is cleared (new company)
+  useEffect(() => {
+    if (!input.trim()) {
+      setControlSetData(null);
+    }
+  }, [input]);
+  
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit();
+    onSubmit(controlSetData);
+  };
+
+  const handleGenerateDescription = async () => {
+    if (!input.trim() || isGeneratingDescription) return;
+    
+    setIsGeneratingDescription(true);
+    try {
+      const description = await generateCompanyDescription(input);
+      setCompanyDescription(description);
+    } catch (error) {
+      // Show error in a user-friendly way - you could add a toast notification here
+      console.error('Failed to generate description:', error);
+      alert('Failed to generate description. Please try again or enter manually.');
+    } finally {
+      setIsGeneratingDescription(false);
+    }
+  };
+
+  const handleControlSetSave = (data) => {
+    setControlSetData(data);
   };
 
   return (
@@ -42,17 +74,38 @@ function InputForm({
       
       <div className="form-group">
         <label htmlFor="companyDescription">Company description:</label>
-        <textarea
-          id="companyDescription"
-          value={companyDescription}
-          onChange={(e) => setCompanyDescription(e.target.value)}
-          placeholder="Describe what the company does, its main products/services, target market, etc."
-          disabled={isLoading}
-          className="input-field description-field"
-          rows={3}
-        />
+        <div className="description-field-container">
+          <textarea
+            id="companyDescription"
+            value={companyDescription}
+            onChange={(e) => setCompanyDescription(e.target.value)}
+            placeholder="Describe what the company does, its main products/services, target market, etc."
+            disabled={isLoading}
+            className="input-field description-field"
+            rows={3}
+          />
+          <button
+            type="button"
+            onClick={handleGenerateDescription}
+            disabled={isLoading || isGeneratingDescription || !input.trim()}
+            className="generate-description-button"
+            title="Auto-generate description using AI"
+          >
+            {isGeneratingDescription ? (
+              <span className="spinner-small"></span>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a10 10 0 0 1 10 10c0 5.52-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2z"></path>
+                <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+                <path d="M9 9h.01"></path>
+                <path d="M15 9h.01"></path>
+              </svg>
+            )}
+            {isGeneratingDescription ? 'Generating...' : 'Generate'}
+          </button>
+        </div>
         <small className="input-help">
-          A brief description helps AIs better identify relevant competitors
+          A brief description helps AIs better identify relevant competitors. Click "Generate" to auto-create a description.
         </small>
       </div>
       
@@ -161,7 +214,6 @@ function InputForm({
         </small>
       </div>
       
-      {/* New Test Mode toggle */}
       <div className="form-group">
         <label>Test Mode</label>
         <div className="toggle-container">
@@ -189,10 +241,16 @@ function InputForm({
         </small>
       </div>
       
+      {testMode && (
+        <div className="control-set-container">
+          <ControlSetInput onSave={handleControlSetSave} />
+        </div>
+      )}
+      
       <button 
         type="submit" 
         className="submit-button"
-        disabled={isLoading || !input.trim()}
+        disabled={isLoading || !input.trim() || (testMode && !controlSetData)}
       >
         {isLoading ? (
           <>
