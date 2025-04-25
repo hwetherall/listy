@@ -4,7 +4,7 @@ import LoadingIndicator from './components/LoadingIndicator';
 import ResultsTable from './components/ResultsTable';
 import ErrorDisplay from './components/ErrorDisplay';
 import ControlSetEvaluation from './components/ControlSetEvaluation';
-import { queryLLMs } from './services/llmService';
+import { queryLLMs, LLM_MODELS } from './services/llmService';
 import { normalizeResults } from './services/normalizationService';
 import { processResults } from './utils/resultProcessor';
 import './styles/main.css';
@@ -26,6 +26,7 @@ function App() {
   const [controlSet, setControlSet] = useState(null);
   const [testMode, setTestMode] = useState(false); // New test mode state
   const [previousCompanies, setPreviousCompanies] = useState([]);
+  const [selectedModels, setSelectedModels] = useState([...LLM_MODELS]); // Initialize with all models
 
   // Effect to update list counts when control set changes and test mode is active
   useEffect(() => {
@@ -58,13 +59,17 @@ function App() {
         input, 
         companyDescription,
         longListCount, 
-        (model, status) => {
+        (model, status, responseTime) => {
           setProgress(prev => ({
             ...prev,
-            [model]: status
+            [model]: {
+              status,
+              responseTime
+            }
           }));
         },
-        fastMode // Pass fastMode to the query function
+        fastMode, // Pass fastMode to the query function
+        selectedModels // Pass the selected models to the query function
       );
       setRawResults(results);
     } catch (err) {
@@ -113,7 +118,8 @@ function App() {
       const processed = processResults(normalizedData, shortListCount);
       
       setNormalizedResults({
-        summary: processed,
+        summary: processed.items || processed, // Handle both new object format and old array format
+        modelResponseTimes: processed.modelResponseTimes || {},
         rawData: normalizedData,
         normalizedControlSet: normalizedControlSet
       });
@@ -246,6 +252,8 @@ function App() {
         setFastMode={setFastMode}
         testMode={testMode}
         setTestMode={setTestMode}
+        selectedModels={selectedModels}
+        setSelectedModels={setSelectedModels}
         onSubmit={handleSubmit}
         isLoading={isLoading}
       />
@@ -334,7 +342,7 @@ function App() {
       </main>
       
       <footer className="app-footer">
-        <p>Powered by OpenRouter API • Using {fastMode ? '6' : '9'} different LLMs{testMode ? ' • Test Mode Active' : ''}</p>
+        <p>Powered by OpenRouter API • Using {selectedModels.length} different LLMs{testMode ? ' • Test Mode Active' : ''}</p>
       </footer>
     </div>
   );

@@ -1,5 +1,5 @@
 // List of LLM models to query
-const LLM_MODELS = [
+export const LLM_MODELS = [
     'microsoft/mai-ds-r1:free',
     // 'google/gemini-2.5-pro-exp-03-25:free', // Removed due to consistent errors and duplicate provider
     'openai/gpt-4o-search-preview',
@@ -69,6 +69,9 @@ const LLM_MODELS = [
       // Update progress status
       updateProgress(model, 'requesting');
       
+      // Start timing
+      const startTime = Date.now();
+      
       const response = await fetch(BASE_URL, {
         method: 'POST',
         headers: {
@@ -94,23 +97,28 @@ const LLM_MODELS = [
   
       const data = await response.json();
       
+      // Calculate response time in seconds (rounded to 2 decimal places)
+      const responseTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      
       // Add check for valid choices array
       if (!data.choices || data.choices.length === 0 || !data.choices[0].message || !data.choices[0].message.content) {
         const errorMessage = `Invalid response structure from ${model}: Missing expected content.`;
         console.error(`Error querying ${model}:`, errorMessage, data); // Log the actual data received
-        updateProgress(model, 'error');
+        updateProgress(model, 'error', responseTime);
         return {
           model,
           error: errorMessage,
-          content: null
+          content: null,
+          responseTime
         };
       }
 
-      updateProgress(model, 'success');
+      updateProgress(model, 'success', responseTime);
       
       return {
         model,
-        content: data.choices[0].message.content
+        content: data.choices[0].message.content,
+        responseTime
       };
     } catch (error) {
       console.error(`Error querying ${model}:`, error);
@@ -119,7 +127,8 @@ const LLM_MODELS = [
       return {
         model,
         error: error.message,
-        content: null
+        content: null,
+        responseTime: 0
       };
     }
   };
@@ -132,12 +141,24 @@ const LLM_MODELS = [
     companyDescription, 
     longListCount, 
     updateProgress = () => {},
-    fastMode = false
+    fastMode = false,
+    customModels = null
   ) => {
     const prompt = generateCompetitorPrompt(companyName, companyDescription, longListCount);
   
-    // Select which LLM models to use based on the mode
-    const selectedModels = fastMode ? FAST_MODE_LLMS : LLM_MODELS;
+    // Determine which models to use
+    let selectedModels;
+    
+    if (customModels && customModels.length > 0) {
+      // Use custom models if provided
+      selectedModels = customModels;
+    } else if (fastMode) {
+      // Fall back to fast mode if no custom models
+      selectedModels = FAST_MODE_LLMS;
+    } else {
+      // Default to all models
+      selectedModels = LLM_MODELS;
+    }
     
     // Make requests to selected LLMs in parallel
     const promises = selectedModels.map(model => 
@@ -151,7 +172,7 @@ const LLM_MODELS = [
     let successCount = 0;
     
     responses.forEach(response => {
-      const { model, content, error } = response;
+      const { model, content, error, responseTime } = response;
       
       if (content) {
         const items = parseNumberedList(content);
@@ -159,13 +180,15 @@ const LLM_MODELS = [
           items,
           error: items.length < longListCount ? 
             `Expected ${longListCount} items but got ${items.length}` : 
-            null
+            null,
+          responseTime
         };
         successCount++;
       } else {
         results[model] = {
           items: [],
-          error
+          error,
+          responseTime: responseTime || 0
         };
       }
     });

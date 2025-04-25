@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { generateCompanyDescription } from '../services/descriptionService';
 import ControlSetInput from './ControlSetInput';
+import { LLM_MODELS } from '../services/llmService';
 
 function InputForm({
   input,
@@ -15,11 +16,14 @@ function InputForm({
   setFastMode,
   testMode,
   setTestMode,
+  selectedModels,
+  setSelectedModels,
   onSubmit,
   isLoading
 }) {
   const [isGeneratingDescription, setIsGeneratingDescription] = useState(false);
   const [controlSetData, setControlSetData] = useState(null);
+  const [showModelSelection, setShowModelSelection] = useState(false);
   
   // Reset control set data when input is cleared (new company)
   useEffect(() => {
@@ -51,6 +55,26 @@ function InputForm({
 
   const handleControlSetSave = (data) => {
     setControlSetData(data);
+  };
+
+  const toggleModelSelection = () => {
+    setShowModelSelection(!showModelSelection);
+  };
+
+  const handleModelToggle = (model) => {
+    if (selectedModels.includes(model)) {
+      setSelectedModels(selectedModels.filter(m => m !== model));
+    } else {
+      setSelectedModels([...selectedModels, model]);
+    }
+  };
+
+  const handleSelectAllModels = () => {
+    setSelectedModels([...LLM_MODELS]);
+  };
+
+  const handleClearAllModels = () => {
+    setSelectedModels([]);
   };
 
   return (
@@ -241,6 +265,64 @@ function InputForm({
         </small>
       </div>
       
+      <div className="form-group">
+        <div className="collapsible-header" onClick={toggleModelSelection}>
+          <label>Custom Model Selection</label>
+          <button 
+            type="button" 
+            className="toggle-collapse-button"
+          >
+            {showModelSelection ? '▲' : '▼'}
+          </button>
+        </div>
+        <small className="input-help">
+          Select which LLMs to use for your query ({selectedModels.length} selected)
+        </small>
+        
+        {showModelSelection && (
+          <div className="model-selection-container">
+            <div className="model-selection-actions">
+              <button 
+                type="button" 
+                onClick={handleSelectAllModels}
+                className="model-selection-action-button"
+                disabled={isLoading}
+              >
+                Select All
+              </button>
+              <button 
+                type="button" 
+                onClick={handleClearAllModels}
+                className="model-selection-action-button"
+                disabled={isLoading}
+              >
+                Clear All
+              </button>
+            </div>
+            <div className="model-checkboxes">
+              {LLM_MODELS.map(model => (
+                <div key={model} className="model-checkbox-item">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedModels.includes(model)}
+                      onChange={() => handleModelToggle(model)}
+                      disabled={isLoading}
+                    />
+                    {model.split('/')[0]}/{model.split('/')[1].split(':')[0]}
+                  </label>
+                </div>
+              ))}
+            </div>
+            {selectedModels.length === 0 && (
+              <div className="model-selection-error">
+                Please select at least one model
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      
       {testMode && (
         <div className="control-set-container">
           <ControlSetInput onSave={handleControlSetSave} />
@@ -250,7 +332,7 @@ function InputForm({
       <button 
         type="submit" 
         className="submit-button"
-        disabled={isLoading || !input.trim() || (testMode && !controlSetData)}
+        disabled={isLoading || !input.trim() || (testMode && !controlSetData) || selectedModels.length === 0}
       >
         {isLoading ? (
           <>

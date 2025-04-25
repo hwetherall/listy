@@ -1,0 +1,22 @@
+.model-response-time {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--neutral-600);
+}
+
+.time-value {
+  font-weight: 600;
+  color: var(--primary);
+  background-color: var(--neutral-100);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Add this to existing model-details styles */
+.model-details {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+} 

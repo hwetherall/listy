@@ -9,11 +9,18 @@ function LoadingIndicator({ message, progress = {} }) {
   };
 
   // Convert progress object to array for rendering
-  const progressItems = Object.entries(progress).map(([model, status]) => ({
-    model,
-    provider: getProviderName(model),
-    status
-  }));
+  const progressItems = Object.entries(progress).map(([model, statusData]) => {
+    // Handle both string status (legacy) and object format with response time
+    const status = typeof statusData === 'object' ? statusData.status : statusData;
+    const responseTime = typeof statusData === 'object' ? statusData.responseTime : null;
+    
+    return {
+      model,
+      provider: getProviderName(model),
+      status,
+      responseTime
+    };
+  });
 
   // Calculate overall progress percentage
   const totalModels = progressItems.length;
@@ -48,12 +55,17 @@ function LoadingIndicator({ message, progress = {} }) {
       
       {progressItems.length > 0 && (
         <div className="progress-container">
-          {progressItems.map(({ model, provider, status }) => (
+          {progressItems.map(({ model, provider, status, responseTime }) => (
             <div 
               key={model} 
               className={`progress-item ${status}`}
             >
-              <span className="provider-name">{provider}</span>
+              <div className="provider-info">
+                <span className="provider-name">{provider}</span>
+                {responseTime && status === 'success' && (
+                  <span className="response-time">{responseTime}s</span>
+                )}
+              </div>
               <span className="status-indicator">
                 {status === 'requesting' && (
                   <div className="dot-pulse"></div>
@@ -123,6 +135,23 @@ const additionalStyles = `
   right: 0;
   font-size: 0.75rem;
   color: var(--neutral-600);
+}
+
+.provider-info {
+  display: flex;
+  align-items: center;
+}
+
+.provider-name {
+  margin-right: var(--space-2);
+}
+
+.response-time {
+  font-size: 0.75rem;
+  color: var(--neutral-600);
+  background-color: var(--neutral-100);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .success-icon {

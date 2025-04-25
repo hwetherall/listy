@@ -2,7 +2,7 @@
  * Process normalized results to get the most frequent items
  * @param {Object} normalizedResults - The normalized results from all LLMs
  * @param {Number} shortListCount - Number of items to include in the final list
- * @returns {Array} The processed results sorted by frequency
+ * @returns {Object} Object containing sorted items and model response times
  */
 export const processResults = (normalizedResults, shortListCount) => {
     // Extract model provider names for more readable output
@@ -14,8 +14,16 @@ export const processResults = (normalizedResults, shortListCount) => {
     // Combine all normalized items from all LLMs with their source
     const allItems = [];
     
+    // Track model response times
+    const modelResponseTimes = {};
+    
     Object.entries(normalizedResults).forEach(([model, result]) => {
       const provider = getProviderName(model);
+      
+      // Store response time if available
+      if (result.responseTime) {
+        modelResponseTimes[model] = result.responseTime;
+      }
       
       result.items.forEach(item => {
         if (item && item.trim()) {
@@ -63,9 +71,12 @@ export const processResults = (normalizedResults, shortListCount) => {
       })
       .slice(0, shortListCount);
     
-    // Add rank and return
-    return sortedItems.map((entry, index) => ({
-      rank: index + 1,
-      ...entry
-    }));
+    // Add rank and return object with items and response times
+    return {
+      items: sortedItems.map((entry, index) => ({
+        rank: index + 1,
+        ...entry
+      })),
+      modelResponseTimes
+    };
   };

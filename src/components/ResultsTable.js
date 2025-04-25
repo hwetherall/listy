@@ -1,9 +1,53 @@
 import React, { useState } from 'react';
 import RawResultsTable from './RawResultsTable';
 
+// New component to display model response times
+function ModelResponseTimes({ responseTimes }) {
+  if (!responseTimes || Object.keys(responseTimes).length === 0) {
+    return null;
+  }
+
+  // Sort models by response time (fastest first)
+  const sortedModels = Object.entries(responseTimes)
+    .sort(([, timeA], [, timeB]) => parseFloat(timeA) - parseFloat(timeB));
+
+  // Helper function to get provider name from model
+  const getProviderName = (model) => {
+    if (!model) return '';
+    const parts = model.split('/');
+    return parts[0]; // Get just the provider name
+  };
+
+  return (
+    <div className="response-times-section">
+      <h3>Model Response Times (Fastest to Slowest)</h3>
+      <div className="response-times-grid">
+        {sortedModels.map(([model, time]) => (
+          <div key={model} className="response-time-item">
+            <div className="provider-badge">{getProviderName(model)}</div>
+            <span className="model-name">{model}</span>
+            <span className="time-badge">{time}s</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ResultsTable({ summaryResults, normalizedRawResults }) {
   const [copySuccess, setCopySuccess] = useState(false);
   const [viewMode, setViewMode] = useState('summary'); // 'summary' or 'detailed'
+
+  // Get model response times from results if available
+  const modelResponseTimes = normalizedRawResults ? 
+    Object.entries(normalizedRawResults)
+      .reduce((acc, [model, data]) => {
+        if (data.responseTime) {
+          acc[model] = data.responseTime;
+        }
+        return acc;
+      }, {}) 
+    : {};
 
   // Handle copying table to clipboard
   const handleCopyToClipboard = () => {
@@ -98,6 +142,11 @@ function ResultsTable({ summaryResults, normalizedRawResults }) {
           )}
         </div>
       </div>
+      
+      {/* Display response times section if we have any */}
+      {Object.keys(modelResponseTimes).length > 0 && (
+        <ModelResponseTimes responseTimes={modelResponseTimes} />
+      )}
       
       <div className="view-toggle-container">
         <button 
@@ -241,43 +290,90 @@ const additionalStyles = `
   color: var(--neutral-600);
 }
 
-.item-cell {
-  display: flex;
-  align-items: center;
+.response-times-section {
+  margin: var(--space-6) 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: var(--neutral-50);
+  border: 1px solid var(--neutral-200);
 }
 
-.item-name {
-  flex: 1;
+.response-times-section h3 {
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+  font-size: 1.1rem;
+  color: var(--neutral-800);
 }
 
-.rank-badge {
-  margin-left: var(--space-2);
-  font-size: 1.25rem;
+.response-times-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--space-3);
 }
 
-.frequency-cell {
+.response-time-item {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background-color: white;
+  border: 1px solid var(--neutral-200);
+  position: relative;
 }
 
-.frequency-value {
+.provider-badge {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  background-color: var(--primary-100);
+  color: var(--primary-700);
+  font-size: 0.75rem;
   font-weight: 600;
-  color: var(--primary-dark);
-  margin-bottom: var(--space-1);
 }
 
-.frequency-bar-container {
-  width: 100%;
-  height: 4px;
-  background-color: var(--neutral-200);
-  border-radius: 2px;
-  overflow: hidden;
+.model-name {
+  font-size: 0.9rem;
+  margin-bottom: var(--space-2);
+  color: var(--neutral-700);
+  padding-right: 60px; /* Make room for the provider badge */
 }
 
-.frequency-bar {
-  height: 100%;
-  background: linear-gradient(to right, var(--primary), var(--secondary));
+.time-badge {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--primary);
+  margin-top: auto;
+}
+
+/* Add these if needed */
+.view-toggle-container {
+  display: flex;
+  margin-bottom: var(--space-4);
+}
+
+.view-toggle-button {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--neutral-300);
+  background-color: var(--neutral-100);
+  cursor: pointer;
+  flex: 1;
+  text-align: center;
+}
+
+.view-toggle-button.active {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.view-toggle-button:first-child {
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
+}
+
+.view-toggle-button:last-child {
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
 }
 `;
 
