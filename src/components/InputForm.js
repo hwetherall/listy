@@ -145,13 +145,13 @@ function InputForm({
             onClick={() => setFastMode(false)}
             disabled={isLoading}
           >
-            Thorough
+            Deep
           </button>
         </div>
         <small className="input-help">
           {fastMode 
             ? "Fast mode queries 6 major LLMs for quicker results" 
-            : "Thorough mode queries all 9 LLMs for more comprehensive results"}
+            : "Deep mode queries all 9 LLMs for more comprehensive results"}
         </small>
       </div>
       

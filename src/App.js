@@ -59,9 +59,13 @@ function App() {
     setError(null);
     
     try {
-      const normalized = await normalizeResults(rawResults);
-      const processed = processResults(normalized, shortListCount);
-      setNormalizedResults(processed);
+      const normalizedData = await normalizeResults(rawResults);
+      const processed = processResults(normalizedData, shortListCount);
+      
+      setNormalizedResults({
+        summary: processed,
+        rawData: normalizedData
+      });
     } catch (err) {
       setError(err.message || 'An error occurred during normalization');
     } finally {
@@ -146,7 +150,7 @@ function App() {
         )}
         
         {normalizedResults && (
-          <ResultsTable results={normalizedResults} />
+          <ResultsTable summaryResults={normalizedResults.summary} normalizedRawResults={normalizedResults.rawData} />
         )}
       </main>
       
