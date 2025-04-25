@@ -11,6 +11,7 @@ import './styles/main.css';
 function App() {
   // State management
   const [input, setInput] = useState('');
+  const [companyDescription, setCompanyDescription] = useState('');
   const [longListCount, setLongListCount] = useState(20);
   const [shortListCount, setShortListCount] = useState(10);
   const [isLoading, setIsLoading] = useState(false);
@@ -19,6 +20,7 @@ function App() {
   const [normalizedResults, setNormalizedResults] = useState(null);
   const [isNormalizing, setIsNormalizing] = useState(false);
   const [progress, setProgress] = useState({});
+  const [fastMode, setFastMode] = useState(true); // Default to fast mode
 
   // Submit handler - Query all LLMs
   const handleSubmit = async () => {
@@ -31,13 +33,15 @@ function App() {
     try {
       const results = await queryLLMs(
         input, 
+        companyDescription,
         longListCount, 
         (model, status) => {
           setProgress(prev => ({
             ...prev,
             [model]: status
           }));
-        }
+        },
+        fastMode // Pass fastMode to the query function
       );
       setRawResults(results);
     } catch (err) {
@@ -73,16 +77,20 @@ function App() {
       </header>
       
       <main>
-        <InputForm
-          input={input}
-          setInput={setInput}
-          longListCount={longListCount}
-          setLongListCount={setLongListCount}
-          shortListCount={shortListCount}
-          setShortListCount={setShortListCount}
-          onSubmit={handleSubmit}
-          isLoading={isLoading}
-        />
+      <InputForm
+        input={input}
+        setInput={setInput}
+        companyDescription={companyDescription}
+        setCompanyDescription={setCompanyDescription}
+        longListCount={longListCount}
+        setLongListCount={setLongListCount}
+        shortListCount={shortListCount}
+        setShortListCount={setShortListCount}
+        fastMode={fastMode}
+        setFastMode={setFastMode}
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
+      />
         
         {isLoading && (
           <LoadingIndicator 
@@ -143,7 +151,7 @@ function App() {
       </main>
       
       <footer className="app-footer">
-        <p>Powered by OpenRouter API • Using 9 different LLMs</p>
+        <p>Powered by OpenRouter API • Using {fastMode ? '6' : '9'} different LLMs</p>
       </footer>
     </div>
   );

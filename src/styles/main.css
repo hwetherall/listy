@@ -217,6 +217,13 @@
     background-color: white;
   }
   
+  .description-field {
+    resize: vertical;
+    min-height: 80px;
+    font-family: var(--font-primary);
+    line-height: 1.5;
+  }
+  
   .input-help {
     display: block;
     font-size: 0.75rem;
@@ -938,6 +945,41 @@
   .provider-tag.x-ai {
     background-color: #000000;
     color: white;
+  }
+  
+  /* Toggle Container */
+  .toggle-container {
+    display: flex;
+    width: 100%;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--neutral-300);
+  }
+  
+  .toggle-button {
+    flex: 1;
+    padding: var(--space-3) var(--space-4);
+    background-color: var(--neutral-50);
+    border: none;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    text-align: center;
+  }
+  
+  .toggle-button.active {
+    background-color: var(--primary);
+    color: white;
+  }
+  
+  .toggle-button:not(.active):hover:not(:disabled) {
+    background-color: var(--neutral-200);
+  }
+  
+  .toggle-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
   
   /* Counter Input */

@@ -3,10 +3,14 @@ import React from 'react';
 function InputForm({
   input,
   setInput,
+  companyDescription,
+  setCompanyDescription,
   longListCount,
   setLongListCount,
   shortListCount,
   setShortListCount,
+  fastMode,
+  setFastMode,
   onSubmit,
   isLoading
 }) {
@@ -18,19 +22,35 @@ function InputForm({
   return (
     <form className="input-form" onSubmit={handleSubmit}>
       <div className="form-group">
-        <label htmlFor="input">Find things similar to:</label>
+        <label htmlFor="input">Find competitors for:</label>
         <input
           type="text"
           id="input"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="e.g., Tesla, Elon Musk, Autonomous Drones..."
+          placeholder="e.g., Airbnb, Uber, Stripe..."
           required
           disabled={isLoading}
           className="input-field"
         />
         <small className="input-help">
-          Enter any company, person, industry, country, or complex description like "AI engineers who lived in Beijing and Houston"
+          Enter the name of the company you want to analyze
+        </small>
+      </div>
+      
+      <div className="form-group">
+        <label htmlFor="companyDescription">Company description:</label>
+        <textarea
+          id="companyDescription"
+          value={companyDescription}
+          onChange={(e) => setCompanyDescription(e.target.value)}
+          placeholder="Describe what the company does, its main products/services, target market, etc."
+          disabled={isLoading}
+          className="input-field description-field"
+          rows={3}
+        />
+        <small className="input-help">
+          A brief description helps AIs better identify relevant competitors
         </small>
       </div>
       
@@ -106,6 +126,33 @@ function InputForm({
             Number of most frequent items to show in final results
           </small>
         </div>
+      </div>
+      
+      <div className="form-group">
+        <label>Mode</label>
+        <div className="toggle-container">
+          <button
+            type="button"
+            className={`toggle-button ${fastMode ? 'active' : ''}`}
+            onClick={() => setFastMode(true)}
+            disabled={isLoading}
+          >
+            Fast
+          </button>
+          <button
+            type="button"
+            className={`toggle-button ${!fastMode ? 'active' : ''}`}
+            onClick={() => setFastMode(false)}
+            disabled={isLoading}
+          >
+            Thorough
+          </button>
+        </div>
+        <small className="input-help">
+          {fastMode 
+            ? "Fast mode queries 6 major LLMs for quicker results" 
+            : "Thorough mode queries all 9 LLMs for more comprehensive results"}
+        </small>
       </div>
       
       <button 
@@ -199,6 +246,39 @@ const additionalStyles = `
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+.toggle-container {
+  display: flex;
+  width: 100%;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--neutral-300);
+}
+
+.toggle-button {
+  flex: 1;
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--neutral-50);
+  border: none;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.toggle-button.active {
+  background-color: var(--primary);
+  color: white;
+}
+
+.toggle-button:not(.active):hover:not(:disabled) {
+  background-color: var(--neutral-200);
+}
+
+.toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 `;
 

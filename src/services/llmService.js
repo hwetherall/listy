@@ -13,25 +13,38 @@ const LLM_MODELS = [
     'google/gemma-3-27b-it'
   ];
   
+  // Fast mode LLM list - only includes the 6 specified providers
+  const FAST_MODE_LLMS = [
+    'cohere/command-r7b-12-2024',
+    'meta-llama/llama-4-scout',
+    'perplexity/sonar-pro',
+    'openai/gpt-4o-search-preview',
+    'anthropic/claude-3.7-sonnet',
+    'google/gemma-3-27b-it'
+  ];
+  
   // Get API key from environment variables
   const API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY;
   const BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
   
   /**
-   * Generate prompt for list creation
+   * Generate prompt for competitor list creation
    */
-  const generateListPrompt = (input, longListCount) => {
-    return `You are an expert at creating comprehensive and accurate lists. Your task is to generate a list of ${longListCount} items that are similar to or related to "${input}".
+  const generateCompetitorPrompt = (companyName, companyDescription, longListCount) => {
+    return `You are a competitive intelligence expert specializing in market research. Your task is to generate a list of ${longListCount} companies that directly compete with "${companyName}".
+  
+  Additional company context: ${companyDescription}
   
   Please follow these guidelines:
-  1. Return exactly ${longListCount} items, no more and no less.
-  2. Format your response as a numbered list (1., 2., 3., etc.)
-  3. Each item should be brief but descriptive.
-  4. Avoid duplicates within your list.
-  5. Focus on the most relevant and significant examples.
-  6. Only provide the list - do not include explanations, introductions, or conclusions.
+  1. Only include companies that offer similar products or services to ${companyName}. Product/service similarity is the PRIMARY criterion.
+  2. Return exactly ${longListCount} distinct competitors, no more and no less.
+  3. Format your response as a numbered list (1., 2., 3., etc.)
+  4. List ONLY the company name (e.g., "Uber" not "Uber - a ridesharing app based in North America").
+  5. Include both established companies and emerging startups if relevant.
+  6. DO NOT include duplicates, subsidiaries of the same parent company, or different branches of the same company.
+  7. Only provide the list - do not include explanations, introductions, or conclusions.
   
-  Your list of ${longListCount} items similar to "${input}":`;
+  Your list of ${longListCount} competitors to "${companyName}":`;
   };
   
   /**
@@ -114,11 +127,20 @@ const LLM_MODELS = [
   /**
    * Query all LLMs in parallel
    */
-  export const queryLLMs = async (input, longListCount, updateProgress = () => {}) => {
-    const prompt = generateListPrompt(input, longListCount);
+  export const queryLLMs = async (
+    companyName, 
+    companyDescription, 
+    longListCount, 
+    updateProgress = () => {},
+    fastMode = false
+  ) => {
+    const prompt = generateCompetitorPrompt(companyName, companyDescription, longListCount);
+  
+    // Select which LLM models to use based on the mode
+    const selectedModels = fastMode ? FAST_MODE_LLMS : LLM_MODELS;
     
-    // Make requests to all LLMs in parallel
-    const promises = LLM_MODELS.map(model => 
+    // Make requests to selected LLMs in parallel
+    const promises = selectedModels.map(model => 
       queryLLM(model, prompt, updateProgress)
     );
     
