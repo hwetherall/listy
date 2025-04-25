@@ -9,6 +9,7 @@ import { queryLLMs } from './services/llmService';
 import { normalizeResults } from './services/normalizationService';
 import { processResults } from './utils/resultProcessor';
 import './styles/main.css';
+import PreviousCompanies from './components/PreviousCompanies';
 
 function App() {
   // State management
@@ -120,6 +121,53 @@ function App() {
     setControlSet(data);
   };
 
+  // Add a function to handle starting a new company
+  const handleNewCompany = () => {
+    // Only proceed if we have normalized results
+    if (!normalizedResults || !input) return;
+    
+    // Extract precision and recall metrics if available
+    let metrics = {
+      precision: 'N/A',
+      recall: 'N/A'
+    };
+    
+    // If we're in test mode and have a control set, use the evaluation metrics
+    if (testMode && controlSet && normalizedResults && normalizedResults.normalizedControlSet) {
+      const shortListMatches = normalizedResults.summary.filter(item => 
+        normalizedResults.normalizedControlSet.competitors.includes(item.item)
+      ).length;
+      
+      const precision = shortListMatches / normalizedResults.summary.length;
+      const recall = shortListMatches / controlSet.competitors.length;
+      
+      metrics = {
+        precision: Math.round(precision * 100) + '%',
+        recall: Math.round(recall * 100) + '%'
+      };
+    }
+    
+    // Save current company data
+    setPreviousCompanies(prev => [...prev, {
+      name: input,
+      description: companyDescription,
+      timestamp: new Date().toLocaleString(),
+      testMode,
+      metrics
+    }]);
+    
+    // Reset form for a new company
+    setInput('');
+    setCompanyDescription('');
+    setRawResults(null);
+    setNormalizedResults(null);
+    setProgress({});
+    
+    // Keep testMode and control set intact for continued testing
+    // Scroll to top of page
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   return (
     <div className="app">
       <header className="app-header">
@@ -210,6 +258,26 @@ function App() {
         {/* Only show ControlSetEvaluation in test mode */}
         {testMode && normalizedResults && controlSet && (
           <ControlSetEvaluation controlSet={controlSet} normalizedResults={normalizedResults} />
+        )}
+
+        {/* Add the PreviousCompanies component before the footer */}
+        {previousCompanies.length > 0 && (
+          <PreviousCompanies companies={previousCompanies} />
+        )}
+        
+        {normalizedResults && (
+          <div className="new-company-section">
+            <button 
+              onClick={handleNewCompany} 
+              className="new-company-button"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Analyse New Company
+            </button>
+          </div>
         )}
       </main>
       
