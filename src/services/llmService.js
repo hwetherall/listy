@@ -1,14 +1,14 @@
 // List of LLM models to query
 const LLM_MODELS = [
-    // 'google/gemini-2.5-pro-exp-03-25:free', // Removed due to consistent errors
-    'deepseek/deepseek-chat-v3-0324:free',
+    'microsoft/mai-ds-r1:free',
+    // 'google/gemini-2.5-pro-exp-03-25:free', // Removed due to consistent errors and duplicate provider
     'openai/gpt-4o-search-preview',
     'anthropic/claude-3.7-sonnet',
-    'x-ai/grok-2-1212',
+    'x-ai/grok-3-mini-beta',
     'cohere/command-r7b-12-2024',
     // 'qwen/qwq-32b:free', // Removed due to slowness
-    'mistralai/mistral-small-3.1-24b-instruct:free',
-    'nvidia/llama-3.1-nemotron-70b-instruct:free',
+    'meta-llama/llama-4-scout',
+    'nvidia/llama-3.1-nemotron-ultra-253b-v1:free',
     'perplexity/sonar-pro',
     'google/gemma-3-27b-it'
   ];
@@ -151,6 +151,8 @@ const LLM_MODELS = [
     if (successCount === 0) {
       throw new Error('Failed to get valid responses from any LLM. Please check your API key and try again.');
     }
+    
+    console.log('LLM responses:', Object.keys(results));
     
     return results;
   };

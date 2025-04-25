@@ -17,16 +17,14 @@ Listy is a React application that helps you create short, consensus-based lists 
 
 ## LLM Models Used
 
-- google/gemini-2.5-pro-exp-03-25:free
 - deepseek/deepseek-chat-v3-0324:free
 - openai/gpt-4o-search-preview
 - anthropic/claude-3.7-sonnet
 - x-ai/grok-2-1212
 - cohere/command-r7b-12-2024
-- qwen/qwq-32b:free
 - mistralai/mistral-small-3.1-24b-instruct:free
 - nvidia/llama-3.1-nemotron-70b-instruct:free
-- perplexity/sonar-deep-research
+- perplexity/sonar-pro
 - google/gemma-3-27b-it
 
 ## Getting Started
