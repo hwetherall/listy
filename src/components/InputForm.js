@@ -11,6 +11,8 @@ function InputForm({
   setShortListCount,
   fastMode,
   setFastMode,
+  testMode,
+  setTestMode,
   onSubmit,
   isLoading
 }) {
@@ -62,7 +64,7 @@ function InputForm({
               type="button" 
               className="counter-btn"
               onClick={() => setLongListCount(Math.max(1, longListCount - 5))}
-              disabled={longListCount <= 5 || isLoading}
+              disabled={longListCount <= 5 || isLoading || testMode}
             >
               −
             </button>
@@ -74,20 +76,22 @@ function InputForm({
               min="1"
               max="100"
               required
-              disabled={isLoading}
+              disabled={isLoading || testMode}
               className="input-field counter-field"
             />
             <button 
               type="button" 
               className="counter-btn"
               onClick={() => setLongListCount(Math.min(100, longListCount + 5))}
-              disabled={longListCount >= 100 || isLoading}
+              disabled={longListCount >= 100 || isLoading || testMode}
             >
               +
             </button>
           </div>
           <small className="input-help">
-            Number of items each LLM will return
+            {testMode 
+              ? "In Test Mode, automatically set to 150% of Control Set size" 
+              : "Number of items each LLM will return"}
           </small>
         </div>
         
@@ -98,7 +102,7 @@ function InputForm({
               type="button" 
               className="counter-btn"
               onClick={() => setShortListCount(Math.max(1, shortListCount - 1))}
-              disabled={shortListCount <= 1 || isLoading}
+              disabled={shortListCount <= 1 || isLoading || testMode}
             >
               −
             </button>
@@ -110,20 +114,22 @@ function InputForm({
               min="1"
               max="50"
               required
-              disabled={isLoading}
+              disabled={isLoading || testMode}
               className="input-field counter-field"
             />
             <button 
               type="button" 
               className="counter-btn"
               onClick={() => setShortListCount(Math.min(50, shortListCount + 1))}
-              disabled={shortListCount >= 50 || isLoading}
+              disabled={shortListCount >= 50 || isLoading || testMode}
             >
               +
             </button>
           </div>
           <small className="input-help">
-            Number of most frequent items to show in final results
+            {testMode 
+              ? "In Test Mode, automatically matches Control Set size" 
+              : "Number of most frequent items to show in final results"}
           </small>
         </div>
       </div>
@@ -155,6 +161,34 @@ function InputForm({
         </small>
       </div>
       
+      {/* New Test Mode toggle */}
+      <div className="form-group">
+        <label>Test Mode</label>
+        <div className="toggle-container">
+          <button
+            type="button"
+            className={`toggle-button ${!testMode ? 'active' : ''}`}
+            onClick={() => setTestMode(false)}
+            disabled={isLoading}
+          >
+            Off
+          </button>
+          <button
+            type="button"
+            className={`toggle-button ${testMode ? 'active' : ''}`}
+            onClick={() => setTestMode(true)}
+            disabled={isLoading}
+          >
+            On
+          </button>
+        </div>
+        <small className="input-help">
+          {testMode 
+            ? "Test Mode enabled - Control Set features activated with automatic list counts" 
+            : "Test Mode disabled - Standard mode without Control Set features"}
+        </small>
+      </div>
+      
       <button 
         type="submit" 
         className="submit-button"
@@ -178,108 +212,5 @@ function InputForm({
     </form>
   );
 }
-
-// Add these styles to your main.css
-const additionalStyles = `
-.counter-input {
-  display: flex;
-  align-items: center;
-}
-
-.counter-field {
-  text-align: center;
-  border-radius: 0;
-  -moz-appearance: textfield;
-}
-
-.counter-field::-webkit-outer-spin-button,
-.counter-field::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-
-.counter-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: var(--neutral-100);
-  border: 1px solid var(--neutral-300);
-  font-size: 1.25rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition-fast);
-  padding: 0;
-}
-
-.counter-btn:first-child {
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
-  border-right: none;
-}
-
-.counter-btn:last-child {
-  border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  border-left: none;
-}
-
-.counter-btn:hover:not(:disabled) {
-  background-color: var(--neutral-200);
-}
-
-.counter-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.spinner-small {
-  display: inline-block;
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-radius: 50%;
-  border-top-color: white;
-  animation: spin 1s linear infinite;
-  margin-right: 8px;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.toggle-container {
-  display: flex;
-  width: 100%;
-  border-radius: var(--radius-md);
-  overflow: hidden;
-  border: 1px solid var(--neutral-300);
-}
-
-.toggle-button {
-  flex: 1;
-  padding: var(--space-3) var(--space-4);
-  background-color: var(--neutral-50);
-  border: none;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition-fast);
-}
-
-.toggle-button.active {
-  background-color: var(--primary);
-  color: white;
-}
-
-.toggle-button:not(.active):hover:not(:disabled) {
-  background-color: var(--neutral-200);
-}
-
-.toggle-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-`;
 
 export default InputForm;

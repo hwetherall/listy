@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import InputForm from './components/InputForm';
 import LoadingIndicator from './components/LoadingIndicator';
 import ResultsTable from './components/ResultsTable';
@@ -24,6 +24,17 @@ function App() {
   const [progress, setProgress] = useState({});
   const [fastMode, setFastMode] = useState(true); // Default to fast mode
   const [controlSet, setControlSet] = useState(null);
+  const [testMode, setTestMode] = useState(false); // New test mode state
+  const [previousCompanies, setPreviousCompanies] = useState([]);
+
+  // Effect to update list counts when control set changes and test mode is active
+  useEffect(() => {
+    if (testMode && controlSet && controlSet.competitors && controlSet.competitors.length > 0) {
+      const competitorCount = controlSet.competitors.length;
+      setShortListCount(competitorCount);
+      setLongListCount(Math.ceil(competitorCount * 1.5)); // 50% more
+    }
+  }, [controlSet, testMode]);
 
   // Submit handler - Query all LLMs
   const handleSubmit = async () => {
@@ -65,8 +76,8 @@ function App() {
       // Create a combined data object that includes both LLM results and control set
       let combinedResults = { ...rawResults };
       
-      // Add control set as a separate "model" if it exists
-      if (controlSet && controlSet.competitors && controlSet.competitors.length > 0) {
+      // Add control set as a separate "model" if it exists and we're in test mode
+      if (testMode && controlSet && controlSet.competitors && controlSet.competitors.length > 0) {
         combinedResults['control_set'] = {
           items: controlSet.competitors,
           type: 'control_set'
@@ -128,12 +139,16 @@ function App() {
         setShortListCount={setShortListCount}
         fastMode={fastMode}
         setFastMode={setFastMode}
+        testMode={testMode}
+        setTestMode={setTestMode}
         onSubmit={handleSubmit}
         isLoading={isLoading}
       />
       
-      {/* Control Set Input */}
-      <ControlSetInput onSave={handleSaveControlSet} />
+      {/* Only show Control Set Input in test mode */}
+      {testMode && (
+        <ControlSetInput onSave={handleSaveControlSet} />
+      )}
         
         {isLoading && (
           <LoadingIndicator 
@@ -192,61 +207,17 @@ function App() {
           <ResultsTable summaryResults={normalizedResults.summary} normalizedRawResults={normalizedResults.rawData} />
         )}
         
-        {/* Control Set Evaluation */}
-        {normalizedResults && controlSet && (
+        {/* Only show ControlSetEvaluation in test mode */}
+        {testMode && normalizedResults && controlSet && (
           <ControlSetEvaluation controlSet={controlSet} normalizedResults={normalizedResults} />
         )}
       </main>
       
       <footer className="app-footer">
-        <p>Powered by OpenRouter API • Using {fastMode ? '6' : '9'} different LLMs</p>
+        <p>Powered by OpenRouter API • Using {fastMode ? '6' : '9'} different LLMs{testMode ? ' • Test Mode Active' : ''}</p>
       </footer>
     </div>
   );
 }
-
-// Add these styles to your main.css
-const additionalStyles = `
-.icon-circle {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: var(--neutral-100);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--primary);
-  margin-right: var(--space-4);
-  flex-shrink: 0;
-}
-
-.normalization-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--space-6);
-}
-
-.normalization-text {
-  flex: 1;
-}
-
-.normalization-text h2 {
-  margin: 0 0 var(--space-2) 0;
-}
-
-.normalization-text p {
-  margin: 0;
-  color: var(--neutral-600);
-}
-
-.app-footer {
-  margin-top: var(--space-12);
-  padding-top: var(--space-6);
-  border-top: 1px solid var(--neutral-200);
-  text-align: center;
-  color: var(--neutral-500);
-  font-size: 0.875rem;
-}
-`;
 
 export default App;

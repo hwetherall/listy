@@ -11,10 +11,11 @@ function ControlSetInput({ onSave }) {
   const parseInput = () => {
     if (!rawInput.trim()) return;
 
-    // Split by whitespace and filter out empty entries
+    // Split by newlines and filter out empty entries
     const potentialCompetitors = rawInput
-      .split(/\s+/)
-      .filter(word => word.trim() !== '' && word.trim().match(/[A-Z]/));
+      .split(/\n/)
+      .map(line => line.trim())
+      .filter(line => line !== '');
     
     setCompetitors(potentialCompetitors);
     setIsParsed(true);
@@ -64,12 +65,17 @@ function ControlSetInput({ onSave }) {
         <div className="input-section">
           <h3>Enter Control Set Data</h3>
           <p className="input-helper-text">
-            Paste your list of competitors. Each word will be treated as a separate competitor.
+            Paste your list of competitors. Each line will be treated as a separate competitor.
           </p>
           <textarea
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
-            placeholder="Example: Lime Bird Spin Tier Jump Voi..."
+            placeholder="Example:
+Bird Global
+Lime
+Spin
+Tier Jump
+Voi"
             className="control-set-textarea"
             rows={6}
           />
