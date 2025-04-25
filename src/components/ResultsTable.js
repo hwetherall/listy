@@ -27,12 +27,7 @@ function ResultsTable({ summaryResults, normalizedRawResults }) {
     } else {
       // Create a string representation of the detailed table
       const models = Object.keys(normalizedRawResults);
-      const providers = models.map(model => {
-        const parts = model.split('/');
-        return parts[0]; // Get just the provider name
-      });
-      
-      const headers = providers;
+      const headers = models; // Use the full model names as headers
       
       // Find the maximum number of items
       const maxItems = Math.max(

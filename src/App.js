@@ -3,6 +3,8 @@ import InputForm from './components/InputForm';
 import LoadingIndicator from './components/LoadingIndicator';
 import ResultsTable from './components/ResultsTable';
 import ErrorDisplay from './components/ErrorDisplay';
+import ControlSetInput from './components/ControlSetInput';
+import ControlSetEvaluation from './components/ControlSetEvaluation';
 import { queryLLMs } from './services/llmService';
 import { normalizeResults } from './services/normalizationService';
 import { processResults } from './utils/resultProcessor';
@@ -21,6 +23,7 @@ function App() {
   const [isNormalizing, setIsNormalizing] = useState(false);
   const [progress, setProgress] = useState({});
   const [fastMode, setFastMode] = useState(true); // Default to fast mode
+  const [controlSet, setControlSet] = useState(null);
 
   // Submit handler - Query all LLMs
   const handleSubmit = async () => {
@@ -59,18 +62,51 @@ function App() {
     setError(null);
     
     try {
-      const normalizedData = await normalizeResults(rawResults);
+      // Create a combined data object that includes both LLM results and control set
+      let combinedResults = { ...rawResults };
+      
+      // Add control set as a separate "model" if it exists
+      if (controlSet && controlSet.competitors && controlSet.competitors.length > 0) {
+        combinedResults['control_set'] = {
+          items: controlSet.competitors,
+          type: 'control_set'
+        };
+      }
+      
+      // Normalize all data together
+      const normalizedData = await normalizeResults(combinedResults);
+      
+      // Get the normalized control set items if they exist
+      const normalizedControlSet = normalizedData['control_set'] 
+        ? {
+            ...controlSet,
+            competitors: normalizedData['control_set'].items,
+            originalCompetitors: controlSet.competitors
+          }
+        : controlSet;
+      
+      // Remove control set from normalized data before processing
+      if (normalizedData['control_set']) {
+        delete normalizedData['control_set'];
+      }
+      
       const processed = processResults(normalizedData, shortListCount);
       
       setNormalizedResults({
         summary: processed,
-        rawData: normalizedData
+        rawData: normalizedData,
+        normalizedControlSet: normalizedControlSet
       });
     } catch (err) {
       setError(err.message || 'An error occurred during normalization');
     } finally {
       setIsNormalizing(false);
     }
+  };
+  
+  // Handler for saving control set
+  const handleSaveControlSet = (data) => {
+    setControlSet(data);
   };
 
   return (
@@ -95,6 +131,9 @@ function App() {
         onSubmit={handleSubmit}
         isLoading={isLoading}
       />
+      
+      {/* Control Set Input */}
+      <ControlSetInput onSave={handleSaveControlSet} />
         
         {isLoading && (
           <LoadingIndicator 
@@ -151,6 +190,11 @@ function App() {
         
         {normalizedResults && (
           <ResultsTable summaryResults={normalizedResults.summary} normalizedRawResults={normalizedResults.rawData} />
+        )}
+        
+        {/* Control Set Evaluation */}
+        {normalizedResults && controlSet && (
+          <ControlSetEvaluation controlSet={controlSet} normalizedResults={normalizedResults} />
         )}
       </main>
       

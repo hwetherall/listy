@@ -1167,3 +1167,330 @@
       min-width: 600px;
     }
   }
+
+  .control-set-input {
+    background-color: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-6);
+    margin-bottom: var(--space-8);
+    border: 1px solid var(--neutral-200);
+  }
+  
+  .input-helper-text {
+    color: var(--neutral-600);
+    font-size: 0.875rem;
+    margin-bottom: var(--space-3);
+  }
+  
+  .control-set-textarea {
+    width: 100%;
+    padding: var(--space-3);
+    border: 1px solid var(--neutral-300);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-family: var(--font-mono);
+    resize: vertical;
+  }
+  
+  .button-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: var(--space-4);
+    gap: var(--space-3);
+  }
+  
+  .parse-button, .save-button {
+    background-color: var(--primary);
+    color: white;
+    border: none;
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
+  }
+  
+  .back-button {
+    background-color: var(--neutral-100);
+    color: var(--neutral-700);
+    border: 1px solid var(--neutral-300);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radius-md);
+    font-weight: 500;
+    cursor: pointer;
+  }
+  
+  .company-display {
+    padding: var(--space-3);
+    background-color: var(--neutral-50);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-4);
+  }
+  
+  .competitors-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 var(--space-4) 0;
+  }
+  
+  .competitor-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+    background-color: var(--neutral-100);
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-2);
+  }
+  
+  .remove-competitor {
+    background: none;
+    border: none;
+    color: var(--error);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+  }
+  
+  .add-competitor {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  
+  .competitor-input {
+    flex: 1;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--neutral-300);
+    border-radius: var(--radius-md);
+  }
+  
+  .add-competitor-button {
+    background-color: var(--neutral-200);
+    color: var(--neutral-800);
+    border: none;
+    padding: var(--space-1) var(--space-3);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .evaluation-container {
+    background-color: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md);
+    padding: var(--space-6);
+    margin-top: var(--space-8);
+    border: 1px solid var(--neutral-200);
+  }
+  
+  .evaluation-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+  
+  .metric-card {
+    background-color: var(--neutral-50);
+    padding: var(--space-4);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--neutral-200);
+  }
+  
+  .metric-card h4 {
+    margin-top: 0;
+    color: var(--neutral-700);
+    font-size: 1rem;
+  }
+  
+  .metric-value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary);
+    margin: var(--space-2) 0;
+  }
+  
+  .metric-desc {
+    font-size: 0.75rem;
+    color: var(--neutral-600);
+  }
+  
+  .metric-distribution {
+    display: flex;
+    height: 12px;
+    background-color: var(--neutral-200);
+    border-radius: 6px;
+    overflow: hidden;
+    margin: var(--space-3) 0;
+  }
+  
+  .distribution-bar {
+    height: 100%;
+  }
+  
+  .distribution-bar.short-list {
+    background-color: var(--success);
+  }
+  
+  .distribution-bar.long-list {
+    background-color: var(--warning);
+  }
+  
+  .distribution-bar.not-found {
+    background-color: var(--error);
+  }
+  
+  .distribution-legend {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--neutral-700);
+  }
+  
+  .legend-item {
+    display: flex;
+    align-items: center;
+  }
+  
+  .legend-color {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: var(--space-1);
+  }
+  
+  .legend-color.short-list {
+    background-color: var(--success);
+  }
+  
+  .legend-color.long-list {
+    background-color: var(--warning);
+  }
+  
+  .legend-color.not-found {
+    background-color: var(--error);
+  }
+  
+  .evaluation-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: var(--space-4);
+  }
+  
+  .evaluation-table th,
+  .evaluation-table td {
+    padding: var(--space-3);
+    text-align: left;
+    border-bottom: 1px solid var(--neutral-200);
+  }
+  
+  .evaluation-table th {
+    font-weight: 600;
+    color: var(--neutral-700);
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: var(--space-1) var(--space-2);
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  
+  .status-badge.in-the-short-list {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: var(--success);
+  }
+  
+  .status-badge.in-the-long-list {
+    background-color: rgba(251, 191, 36, 0.1);
+    color: var(--warning);
+  }
+  
+  .status-badge.not-on-the-list {
+    background-color: rgba(239, 68, 68, 0.1);
+    color: var(--error);
+  }
+
+  /* Styles for the normalization note in the control set evaluation */
+  .normalization-note {
+    display: block;
+    font-size: 0.8rem;
+    color: var(--neutral-600);
+    font-style: italic;
+    margin-top: 0.25rem;
+  }
+
+  /* Ensure the evaluation table cells have enough padding for the notes */
+  .evaluation-table td {
+    padding: 0.75rem 1rem;
+    vertical-align: top;
+  }
+
+  /* Add these styles for the evaluation columns */
+  .evaluation-columns {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-4);
+    margin-top: var(--space-6);
+  }
+
+  .evaluation-column {
+    background-color: var(--neutral-50);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--neutral-200);
+    overflow: hidden;
+  }
+
+  .column-header {
+    padding: var(--space-3);
+    margin: 0;
+    font-size: 0.9rem;
+    color: white;
+    text-align: center;
+  }
+
+  .column-header.short-list {
+    background-color: var(--success);
+  }
+
+  .column-header.long-list {
+    background-color: var(--warning);
+  }
+
+  .column-header.not-found {
+    background-color: var(--error);
+  }
+
+  .competitor-list {
+    list-style: none;
+    padding: var(--space-3);
+    margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+
+  .competitor-list .competitor-item {
+    padding: var(--space-2) var(--space-3);
+    background-color: white;
+    border-radius: var(--radius-md);
+    margin-bottom: var(--space-2);
+    border: 1px solid var(--neutral-200);
+  }
+
+  .empty-message {
+    color: var(--neutral-600);
+    font-style: italic;
+    text-align: center;
+    padding: var(--space-4);
+  }
+
+  /* Add responsive layout for smaller screens */
+  @media (max-width: 768px) {
+    .evaluation-columns {
+      grid-template-columns: 1fr;
+    }
+  }
+
