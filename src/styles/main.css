@@ -1702,3 +1702,268 @@
   margin-top: 0.5rem;
   font-size: 0.9rem;
 }
+
+/* Model Metrics Section Styles */
+.model-metrics-section {
+  background-color: white;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6);
+  margin: var(--space-8) 0;
+  border: 1px solid var(--neutral-200);
+}
+
+.metrics-header {
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metrics-header h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--neutral-800);
+}
+
+.metrics-explanation {
+  color: var(--neutral-600);
+  font-size: 0.85rem;
+  margin-bottom: var(--space-4);
+  line-height: 1.5;
+}
+
+.model-metrics-container {
+  margin-top: var(--space-4);
+}
+
+.model-metrics-table-container {
+  overflow-x: auto;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--neutral-200);
+  margin-bottom: var(--space-6);
+}
+
+.model-metrics-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.model-metrics-table th,
+.model-metrics-table td {
+  padding: var(--space-3);
+  text-align: left;
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.model-metrics-table th {
+  background-color: var(--neutral-100);
+  font-weight: 600;
+  color: var(--neutral-700);
+  position: sticky;
+  top: 0;
+}
+
+.model-metrics-table tr:hover {
+  background-color: var(--neutral-50);
+}
+
+.model-metrics-table tr:first-child {
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.metric-value-cell {
+  position: relative;
+  min-width: 100px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+}
+
+.metric-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  background: linear-gradient(to right, var(--primary-light), var(--primary));
+  opacity: 0.2;
+  z-index: 0;
+  border-radius: var(--radius-sm);
+}
+
+.metric-value-cell span {
+  position: relative;
+  z-index: 1;
+  font-weight: 600;
+  color: var(--primary-dark);
+  margin-left: var(--space-2);
+}
+
+.metrics-insights {
+  background-color: var(--neutral-50);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--neutral-200);
+}
+
+.metrics-insights h4 {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+  font-size: 1rem;
+  color: var(--neutral-800);
+}
+
+.metrics-insights ul {
+  margin: 0;
+  padding-left: var(--space-4);
+}
+
+.metrics-insights li {
+  margin-bottom: var(--space-2);
+  color: var(--neutral-700);
+}
+
+.metrics-insights strong {
+  color: var(--neutral-900);
+}
+
+@media (max-width: 768px) {
+  .metric-value-cell {
+    min-width: 80px;
+  }
+}
+
+/* Add these styles - should be appended to the existing model metrics styles */
+
+/* Model Metrics Selection */
+.metrics-selection-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.metrics-action-button {
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--neutral-100);
+  border: 1px solid var(--neutral-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  color: var(--neutral-700);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.metrics-action-button:hover:not(:disabled) {
+  background-color: var(--neutral-200);
+  border-color: var(--neutral-400);
+}
+
+.metrics-recalculate-button {
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.metrics-recalculate-button:hover:not(:disabled) {
+  background-color: var(--primary-dark);
+}
+
+.metrics-recalculate-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.model-toggle-cell {
+  width: 40px;
+  text-align: center;
+}
+
+.model-toggle-cell input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.selected-model {
+  background-color: rgba(99, 102, 241, 0.05);
+}
+
+.deselected-model {
+  opacity: 0.6;
+}
+
+/* Recalculated Results */
+.recalculated-results-section {
+  background-color: white;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-6);
+  margin: var(--space-8) 0;
+  border: 1px solid var(--neutral-200);
+  border-left: 4px solid var(--secondary);
+}
+
+.recalculated-results-header {
+  color: var(--secondary);
+  font-size: 1.2rem;
+  margin-top: 0;
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--neutral-200);
+}
+
+.recalculated-metrics {
+  margin-bottom: var(--space-4);
+}
+
+.recalculated-metrics-summary {
+  display: flex;
+  gap: var(--space-6);
+  padding: var(--space-4);
+  background-color: rgba(20, 184, 166, 0.1);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.recalculated-metric {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.recalculated-metric-label {
+  font-weight: 500;
+  color: var(--neutral-700);
+}
+
+.recalculated-metric-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--secondary);
+}
+
+@media (max-width: 768px) {
+  .metrics-selection-actions {
+    flex-direction: column;
+  }
+  
+  .metrics-recalculate-button {
+    margin-left: 0;
+  }
+  
+  .recalculated-metrics-summary {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+}

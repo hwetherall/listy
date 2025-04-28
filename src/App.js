@@ -27,6 +27,13 @@ function App() {
   const [testMode, setTestMode] = useState(false); // New test mode state
   const [previousCompanies, setPreviousCompanies] = useState([]);
   const [selectedModels, setSelectedModels] = useState([...LLM_MODELS]); // Initialize with all models
+  const [showModelMetrics, setShowModelMetrics] = useState(false);
+  const [llmMetrics, setLlmMetrics] = useState({});
+  
+  // State for model selection in the metrics panel
+  const [metricsModelSelection, setMetricsModelSelection] = useState({});
+  const [recalculatedResults, setRecalculatedResults] = useState(null);
+  const [isRecalculating, setIsRecalculating] = useState(false);
 
   // Effect to update list counts when control set changes and test mode is active
   useEffect(() => {
@@ -41,6 +48,18 @@ function App() {
     }
   }, [controlSet, testMode]);
 
+  // Initialize metrics model selection when llmMetrics changes
+  useEffect(() => {
+    if (Object.keys(llmMetrics).length > 0) {
+      const initialSelections = {};
+      Object.keys(llmMetrics).forEach(model => {
+        initialSelections[model] = true; // Default all to selected
+      });
+      setMetricsModelSelection(initialSelections);
+      setRecalculatedResults(null); // Reset recalculated results when raw metrics change
+    }
+  }, [llmMetrics]);
+
   // Submit handler - Query all LLMs
   const handleSubmit = async (controlSetData) => {
     setIsLoading(true);
@@ -48,6 +67,8 @@ function App() {
     setRawResults(null);
     setNormalizedResults(null);
     setProgress({});
+    setLlmMetrics({});
+    setRecalculatedResults(null);
     
     // Update control set if provided from the form
     if (controlSetData) {
@@ -117,6 +138,54 @@ function App() {
       
       const processed = processResults(normalizedData, shortListCount);
       
+      // Calculate precision and recall metrics per LLM model if in test mode
+      if (testMode && normalizedControlSet && normalizedControlSet.competitors && normalizedControlSet.competitors.length > 0) {
+        const modelMetrics = {};
+        const normalizedControlSetCompetitors = new Set(normalizedControlSet.competitors);
+        
+        // For each LLM model
+        Object.entries(normalizedData).forEach(([model, modelData]) => {
+          if (!modelData || !modelData.items) return;
+          
+          // Precision: How many of this model's items are in the control set
+          const modelItems = new Set(modelData.items);
+          let precisionMatches = 0;
+          
+          modelItems.forEach(item => {
+            if (normalizedControlSetCompetitors.has(item)) {
+              precisionMatches++;
+            }
+          });
+          
+          const precision = modelItems.size > 0 
+            ? precisionMatches / modelItems.size
+            : 0;
+          
+          // Recall: How many of the control set items were found by this model
+          let recallMatches = 0;
+          
+          normalizedControlSetCompetitors.forEach(controlItem => {
+            if (modelItems.has(controlItem)) {
+              recallMatches++;
+            }
+          });
+          
+          const recall = normalizedControlSetCompetitors.size > 0
+            ? recallMatches / normalizedControlSetCompetitors.size
+            : 0;
+          
+          // Store metrics for this model
+          modelMetrics[model] = {
+            precision: Math.round(precision * 100),
+            recall: Math.round(recall * 100),
+            itemCount: modelItems.size,
+            responseTime: modelData.responseTime || 0
+          };
+        });
+        
+        setLlmMetrics(modelMetrics);
+      }
+      
       setNormalizedResults({
         summary: processed.items || processed, // Handle both new object format and old array format
         modelResponseTimes: processed.modelResponseTimes || {},
@@ -128,6 +197,137 @@ function App() {
     } finally {
       setIsNormalizing(false);
     }
+  };
+
+  // Recalculate results based on selected models
+  const handleRecalculate = async () => {
+    if (!normalizedResults || !Object.keys(metricsModelSelection).length) return;
+    
+    setIsRecalculating(true);
+    
+    try {
+      // Filter out deselected models
+      const filteredRawData = {};
+      Object.keys(normalizedResults.rawData).forEach(model => {
+        if (metricsModelSelection[model]) {
+          filteredRawData[model] = normalizedResults.rawData[model];
+        }
+      });
+      
+      // Check if we have any models left after filtering
+      if (Object.keys(filteredRawData).length === 0) {
+        throw new Error('At least one model must be selected for recalculation');
+      }
+      
+      // Process the filtered results
+      const recalculatedProcessed = processResults(filteredRawData, shortListCount);
+
+      // Calculate new metrics if in test mode with control set
+      const recalculatedMetrics = {};
+      
+      if (testMode && normalizedResults.normalizedControlSet) {
+        const normalizedControlSetCompetitors = new Set(normalizedResults.normalizedControlSet.competitors);
+        
+        // Calculate metrics for each model
+        Object.entries(filteredRawData).forEach(([model, modelData]) => {
+          if (!modelData || !modelData.items) return;
+          
+          const modelItems = new Set(modelData.items);
+          let precisionMatches = 0;
+          
+          modelItems.forEach(item => {
+            if (normalizedControlSetCompetitors.has(item)) {
+              precisionMatches++;
+            }
+          });
+          
+          const precision = modelItems.size > 0 
+            ? precisionMatches / modelItems.size
+            : 0;
+          
+          let recallMatches = 0;
+          
+          normalizedControlSetCompetitors.forEach(controlItem => {
+            if (modelItems.has(controlItem)) {
+              recallMatches++;
+            }
+          });
+          
+          const recall = normalizedControlSetCompetitors.size > 0
+            ? recallMatches / normalizedControlSetCompetitors.size
+            : 0;
+          
+          recalculatedMetrics[model] = {
+            precision: Math.round(precision * 100),
+            recall: Math.round(recall * 100),
+            itemCount: modelItems.size,
+            responseTime: llmMetrics[model]?.responseTime || 0
+          };
+        });
+        
+        // Add overall metrics for the recalculated short list
+        const shortListItems = new Set(recalculatedProcessed.items ? recalculatedProcessed.items.map(item => item.item) : recalculatedProcessed.map(item => item.item));
+        let overallPrecisionMatches = 0;
+        
+        shortListItems.forEach(item => {
+          if (normalizedControlSetCompetitors.has(item)) {
+            overallPrecisionMatches++;
+          }
+        });
+        
+        const overallPrecision = shortListItems.size > 0
+          ? overallPrecisionMatches / shortListItems.size
+          : 0;
+        
+        let overallRecallMatches = 0;
+        normalizedControlSetCompetitors.forEach(controlItem => {
+          if (shortListItems.has(controlItem)) {
+            overallRecallMatches++;
+          }
+        });
+        
+        const overallRecall = normalizedControlSetCompetitors.size > 0
+          ? overallRecallMatches / normalizedControlSetCompetitors.size
+          : 0;
+        
+        // Add summary metrics
+        recalculatedMetrics['overall'] = {
+          precision: Math.round(overallPrecision * 100),
+          recall: Math.round(overallRecall * 100),
+          selectedModels: Object.keys(filteredRawData).length
+        };
+      }
+
+      setRecalculatedResults({
+        summary: recalculatedProcessed.items || recalculatedProcessed,
+        rawData: filteredRawData,
+        metrics: recalculatedMetrics
+      });
+    } catch (err) {
+      setError(err.message || 'An error occurred during recalculation');
+    } finally {
+      setIsRecalculating(false);
+    }
+  };
+
+  // Handle toggling a model in the metrics panel
+  const handleMetricsModelToggle = (model) => {
+    setMetricsModelSelection(prev => ({
+      ...prev,
+      [model]: !prev[model]
+    }));
+    // Reset recalculated results when selection changes
+    setRecalculatedResults(null);
+  };
+
+  // Select/deselect all models
+  const handleSelectAllMetricsModels = (select) => {
+    const newSelection = {};
+    Object.keys(llmMetrics).forEach(model => {
+      newSelection[model] = select;
+    });
+    setMetricsModelSelection(newSelection);
+    setRecalculatedResults(null);
   };
 
   // Add a function to handle starting a new company
@@ -217,6 +417,8 @@ function App() {
     setRawResults(null);
     setNormalizedResults(null);
     setProgress({});
+    setLlmMetrics({});
+    setRecalculatedResults(null);
 
     // Reset control set for new company
     setControlSet(null);
@@ -229,6 +431,15 @@ function App() {
 
     // Scroll to top of page
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const toggleModelMetrics = () => {
+    setShowModelMetrics(!showModelMetrics);
+  };
+
+  // Count how many models are selected in the metrics panel
+  const countSelectedMetricsModels = () => {
+    return Object.values(metricsModelSelection).filter(Boolean).length;
   };
 
   return (
@@ -313,6 +524,190 @@ function App() {
         
         {normalizedResults && (
           <ResultsTable summaryResults={normalizedResults.summary} normalizedRawResults={normalizedResults.rawData} />
+        )}
+
+        {/* Recalculated Results */}
+        {recalculatedResults && (
+          <div className="recalculated-results-section">
+            <h3 className="recalculated-results-header">
+              Recalculated Results ({countSelectedMetricsModels()} Models)
+            </h3>
+            
+            <div className="recalculated-metrics">
+              {recalculatedResults.metrics && recalculatedResults.metrics.overall && (
+                <div className="recalculated-metrics-summary">
+                  <div className="recalculated-metric">
+                    <span className="recalculated-metric-label">Precision:</span>
+                    <span className="recalculated-metric-value">{recalculatedResults.metrics.overall.precision}%</span>
+                  </div>
+                  <div className="recalculated-metric">
+                    <span className="recalculated-metric-label">Recall:</span>
+                    <span className="recalculated-metric-value">{recalculatedResults.metrics.overall.recall}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <ResultsTable summaryResults={recalculatedResults.summary} normalizedRawResults={recalculatedResults.rawData} />
+          </div>
+        )}
+
+        {/* LLM Metrics Section - only show in test mode with control set */}
+        {testMode && normalizedResults && Object.keys(llmMetrics).length > 0 && (
+          <div className="model-metrics-section">
+            <div className="collapsible-header metrics-header" onClick={toggleModelMetrics}>
+              <h3>LLM Model Performance Metrics</h3>
+              <button 
+                type="button" 
+                className="toggle-collapse-button"
+              >
+                {showModelMetrics ? '▲' : '▼'}
+              </button>
+            </div>
+            
+            {showModelMetrics && (
+              <div className="model-metrics-container">
+                <p className="metrics-explanation">
+                  Precision: percentage of model's results that match the control set<br />
+                  Recall: percentage of control set items found by the model
+                </p>
+                
+                <div className="metrics-selection-actions">
+                  <button 
+                    type="button" 
+                    onClick={() => handleSelectAllMetricsModels(true)}
+                    className="metrics-action-button"
+                    disabled={isRecalculating}
+                  >
+                    Select All
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={() => handleSelectAllMetricsModels(false)}
+                    className="metrics-action-button"
+                    disabled={isRecalculating}
+                  >
+                    Deselect All
+                  </button>
+                  <button 
+                    type="button" 
+                    onClick={handleRecalculate}
+                    className="metrics-recalculate-button"
+                    disabled={isRecalculating || countSelectedMetricsModels() === 0}
+                  >
+                    {isRecalculating ? (
+                      <>
+                        <span className="spinner-small"></span>
+                        Recalculating...
+                      </>
+                    ) : (
+                      "Recalculate with Selected Models"
+                    )}
+                  </button>
+                </div>
+                
+                <div className="model-metrics-table-container">
+                  <table className="model-metrics-table">
+                    <thead>
+                      <tr>
+                        <th>Use</th>
+                        <th>Model</th>
+                        <th>Precision</th>
+                        <th>Recall</th>
+                        <th>Response Time</th>
+                        <th>Items Found</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(llmMetrics)
+                        .sort((a, b) => {
+                          // Sort by highest F1 score (harmonic mean of precision and recall)
+                          const f1A = a[1].precision * a[1].recall > 0 
+                            ? 2 * (a[1].precision * a[1].recall) / (a[1].precision + a[1].recall)
+                            : 0;
+                          const f1B = b[1].precision * b[1].recall > 0
+                            ? 2 * (b[1].precision * b[1].recall) / (b[1].precision + b[1].recall)
+                            : 0;
+                          return f1B - f1A;
+                        })
+                        .map(([model, metrics]) => (
+                          <tr key={model} className={metricsModelSelection[model] ? 'selected-model' : 'deselected-model'}>
+                            <td className="model-toggle-cell">
+                              <input
+                                type="checkbox"
+                                checked={!!metricsModelSelection[model]}
+                                onChange={() => handleMetricsModelToggle(model)}
+                                disabled={isRecalculating}
+                                id={`metrics-model-${model}`}
+                              />
+                            </td>
+                            <td>{model.split('/')[0]}/{model.split('/')[1].split(':')[0]}</td>
+                            <td>
+                              <div className="metric-value-cell">
+                                <div className="metric-bar" style={{ width: `${metrics.precision}%` }}></div>
+                                <span>{metrics.precision}%</span>
+                              </div>
+                            </td>
+                            <td>
+                              <div className="metric-value-cell">
+                                <div className="metric-bar" style={{ width: `${metrics.recall}%` }}></div>
+                                <span>{metrics.recall}%</span>
+                              </div>
+                            </td>
+                            <td>{metrics.responseTime}s</td>
+                            <td>{metrics.itemCount}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <div className="metrics-insights">
+                  <h4>Performance Insights</h4>
+                  <ul>
+                    {Object.entries(llmMetrics)
+                      .sort((a, b) => b[1].precision - a[1].precision)
+                      .slice(0, 1)
+                      .map(([model, metrics]) => (
+                        <li key={`precision-${model}`}>
+                          <strong>Highest Precision:</strong> {model.split('/')[0]}/{model.split('/')[1].split(':')[0]} ({metrics.precision}%)
+                        </li>
+                      ))}
+                    {Object.entries(llmMetrics)
+                      .sort((a, b) => b[1].recall - a[1].recall)
+                      .slice(0, 1)
+                      .map(([model, metrics]) => (
+                        <li key={`recall-${model}`}>
+                          <strong>Highest Recall:</strong> {model.split('/')[0]}/{model.split('/')[1].split(':')[0]} ({metrics.recall}%)
+                        </li>
+                      ))}
+                    {Object.entries(llmMetrics)
+                      .sort((a, b) => {
+                        // Sort by highest F1 score
+                        const f1A = a[1].precision * a[1].recall > 0 
+                          ? 2 * (a[1].precision * a[1].recall) / (a[1].precision + a[1].recall)
+                          : 0;
+                        const f1B = b[1].precision * b[1].recall > 0
+                          ? 2 * (b[1].precision * b[1].recall) / (b[1].precision + b[1].recall)
+                          : 0;
+                        return f1B - f1A;
+                      })
+                      .slice(0, 1)
+                      .map(([model, metrics]) => {
+                        const f1 = metrics.precision * metrics.recall > 0
+                          ? Math.round(2 * (metrics.precision * metrics.recall) / (metrics.precision + metrics.recall))
+                          : 0;
+                        return (
+                          <li key={`f1-${model}`}>
+                            <strong>Best Overall (F1):</strong> {model.split('/')[0]}/{model.split('/')[1].split(':')[0]} (F1 Score: {f1}%)
+                          </li>
+                        );
+                      })}
+                  </ul>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         
         {/* Only show ControlSetEvaluation in test mode */}
