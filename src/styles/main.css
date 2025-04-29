@@ -1995,3 +1995,122 @@
 .api-key-warning a:hover {
   text-decoration: none;
 }
+
+/* Report Processing styles */
+.report-processing-container {
+  background-color: white;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-200);
+  padding: var(--space-4);
+  margin: var(--space-6) 0;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.report-processing-container h3 {
+  margin-top: 0;
+  margin-bottom: var(--space-3);
+  font-size: 1.25rem;
+  color: var(--neutral-900);
+}
+
+.report-progress-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.progress-icon {
+  font-size: 1.2rem;
+}
+
+.report-progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background-color: var(--neutral-200);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.report-progress-bar {
+  height: 100%;
+  background-color: var(--primary);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+/* Pre-Process Report Button */
+.process-report-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-5);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  gap: var(--space-2);
+  margin: var(--space-4) 0;
+}
+
+.process-report-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.process-report-button:disabled {
+  background-color: var(--neutral-400);
+  cursor: not-allowed;
+}
+
+.results-actions-container {
+  display: flex;
+  justify-content: center;
+  margin: var(--space-6) 0;
+}
+
+.normalize-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-3) var(--space-5);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  gap: var(--space-2);
+}
+
+.normalize-button:hover {
+  background-color: var(--primary-dark);
+}
+
+.normalize-button:disabled {
+  background-color: var(--neutral-400);
+  cursor: not-allowed;
+}
+
+.back-to-results-button,
+.back-to-all-button {
+  display: block;
+  margin: var(--space-6) auto;
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--neutral-100);
+  border: 1px solid var(--neutral-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-to-results-button:hover,
+.back-to-all-button:hover {
+  background-color: var(--neutral-200);
+}

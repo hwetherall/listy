@@ -258,7 +258,9 @@ function InputForm({
         
         <div className="mode-description">
           {reportMode 
-            ? "Report mode returns fixed sets of 10 companies for each selected category" 
+            ? fastMode
+              ? "Report mode with Fast mode: Returns company sets using 6 major LLMs for quicker results"
+              : "Report mode with Deep mode: Returns company sets using all 9 LLMs for more comprehensive results"
             : fastMode 
               ? "Fast mode queries 6 major LLMs for quicker results" 
               : "Deep mode queries all 9 LLMs for more comprehensive results"}

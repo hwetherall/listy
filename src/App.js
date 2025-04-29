@@ -11,7 +11,9 @@ import {
   generateRegionalPrompt, 
   generateInterestingPrompt, 
   generateGraveyardPrompt,
-  generateRegionSpecificPrompt 
+  generateRegionSpecificPrompt,
+  preprocessReport,
+  generateCompetitorReport
 } from './services/llmService';
 import { normalizeResults } from './services/normalizationService';
 import { processResults } from './utils/resultProcessor';
@@ -20,6 +22,12 @@ import PreviousCompanies from './components/PreviousCompanies';
 import env from './utils/customEnv';
 // Import debug module
 import { checkApiKey, testApiKey } from './debug';
+// Import the new ReportResultsTable component
+import ReportResultsTable from './components/ReportResultsTable';
+import './components/ReportResultsTable.css';
+// Import the CompetitorReport component
+import CompetitorReport from './components/CompetitorReport';
+import './components/CompetitorReport.css';
 
 function App() {
   // State for API key status and validity
@@ -94,6 +102,22 @@ function App() {
     graveyard: []
   });
 
+  // Add new state for the report processing
+  const [isProcessingReport, setIsProcessingReport] = useState(false);
+  const [reportProgress, setReportProgress] = useState({});
+  const [reportResults, setReportResults] = useState(null);
+  const [reportError, setReportError] = useState(null);
+  const [showReportResults, setShowReportResults] = useState(false);
+  
+  // Add new state for the competitor report
+  const [competitorReport, setCompetitorReport] = useState(null);
+  const [isGeneratingCompetitorReport, setIsGeneratingCompetitorReport] = useState(false);
+  const [competitorReportProgress, setCompetitorReportProgress] = useState({});
+  const [showCompetitorReport, setShowCompetitorReport] = useState(false);
+  
+  // Add state for managing manually removed companies
+  const [filteredReportResults, setFilteredReportResults] = useState(null);
+
   // Effect to update list counts when control set changes and test mode is active
   useEffect(() => {
     if (testMode && controlSet && controlSet.competitors && controlSet.competitors.length > 0) {
@@ -118,6 +142,13 @@ function App() {
       setRecalculatedResults(null); // Reset recalculated results when raw metrics change
     }
   }, [llmMetrics]);
+  
+  // Set filtered results when report results change
+  useEffect(() => {
+    if (reportResults) {
+      setFilteredReportResults(reportResults);
+    }
+  }, [reportResults]);
 
   // Helper function to parse numbered list from LLM response 
   const parseNumberedList = (content) => {
@@ -140,6 +171,11 @@ function App() {
     setProgress({});
     setLlmMetrics({});
     setRecalculatedResults(null);
+    
+    // Reset competitor report state
+    setCompetitorReport(null);
+    setShowCompetitorReport(false);
+    setFilteredReportResults(null);
     
     // Update control set if provided from the form
     if (controlSetData) {
@@ -186,7 +222,7 @@ function App() {
               }));
             },
             fastMode,
-            selectedModels,
+            fastMode ? null : selectedModels, // Only use selectedModels if not in fastMode
             category, // Pass the current category
             categoryPrompt // Pass the generated prompt
           );
@@ -583,6 +619,8 @@ function App() {
     setProgress({});
     setLlmMetrics({});
     setRecalculatedResults(null);
+    setCompetitorReport(null);
+    setShowCompetitorReport(false);
 
     // Reset control set for new company
     setControlSet(null);
@@ -611,24 +649,151 @@ function App() {
     return Object.values(metricsModelSelection).filter(Boolean).length;
   };
 
+  // Handle pre-processing the report
+  const handlePreProcessReport = async () => {
+    if (!normalizedResults || !categorizedResults) {
+      setReportError('Please generate and normalize competitor results first');
+      return;
+    }
+    
+    setIsProcessingReport(true);
+    setReportError(null);
+    setReportProgress({});
+    setShowReportResults(true);
+    setShowCompetitorReport(false);
+    
+    try {
+      const results = await preprocessReport(
+        categorizedResults, 
+        input, 
+        companyDescription,
+        (status, progress) => {
+          setReportProgress({
+            status,
+            progress
+          });
+        }
+      );
+      
+      setReportResults(results);
+      setFilteredReportResults(results);
+    } catch (err) {
+      setReportError(err.message || 'An error occurred while processing the report');
+    } finally {
+      setIsProcessingReport(false);
+    }
+  };
+  
+  // Handle generating the competitor report
+  const handleGenerateCompetitorReport = async () => {
+    if (!filteredReportResults) {
+      setReportError('Please pre-process report results first');
+      return;
+    }
+    
+    setIsGeneratingCompetitorReport(true);
+    setReportError(null);
+    setCompetitorReportProgress({});
+    setShowCompetitorReport(true);
+    setShowReportResults(false);
+    
+    try {
+      const report = await generateCompetitorReport(
+        filteredReportResults,
+        input,
+        companyDescription,
+        (status, progress) => {
+          setCompetitorReportProgress({
+            status,
+            progress
+          });
+        }
+      );
+      
+      setCompetitorReport(report.reportContent);
+    } catch (err) {
+      setReportError(err.message || 'An error occurred while generating the competitor report');
+      setShowCompetitorReport(false);
+      setShowReportResults(true);
+    } finally {
+      setIsGeneratingCompetitorReport(false);
+    }
+  };
+
+  // Handle saving the edited competitor report
+  const handleSaveCompetitorReport = (updatedReport) => {
+    setCompetitorReport(updatedReport);
+  };
+  
+  // Handle updating report results when companies are removed
+  const handleUpdateReportResults = (updatedResults) => {
+    // Update the filtered results with the user-curated list
+    setFilteredReportResults({
+      ...filteredReportResults,
+      results: updatedResults
+    });
+    
+    // Count how many are left in each category
+    const countByType = {
+      incumbent: 0,
+      regional: 0,
+      interesting: 0,
+      graveyard: 0
+    };
+    
+    updatedResults.forEach(item => {
+      if (item.type === 'Incumbent') countByType.incumbent++;
+      else if (item.type === 'Regional') countByType.regional++;
+      else if (item.type === 'Interesting') countByType.interesting++;
+      else if (item.type === 'Graveyard') countByType.graveyard++;
+    });
+    
+    // Update the stats
+    const updatedStats = {
+      incumbent: {
+        total: filteredReportResults.stats.incumbent.total,
+        valid: countByType.incumbent,
+        invalid: filteredReportResults.stats.incumbent.total - countByType.incumbent
+      },
+      regional: {
+        total: filteredReportResults.stats.regional.total,
+        valid: countByType.regional,
+        invalid: filteredReportResults.stats.regional.total - countByType.regional
+      },
+      interesting: {
+        total: filteredReportResults.stats.interesting.total,
+        valid: countByType.interesting,
+        invalid: filteredReportResults.stats.interesting.total - countByType.interesting
+      },
+      graveyard: {
+        total: filteredReportResults.stats.graveyard.total,
+        valid: countByType.graveyard,
+        invalid: filteredReportResults.stats.graveyard.total - countByType.graveyard
+      }
+    };
+    
+    setFilteredReportResults(prev => ({
+      ...prev,
+      stats: updatedStats
+    }));
+  };
+
   return (
-    <div className="app">
+    <div className="app-container">
       <header className="app-header">
-        <h1>Listy</h1>
-        <p>Create short lists from long lists based on multiple LLMs</p>
+        <h1>ListyAI <span className="version-tag">v0.9.3</span></h1>
+        <p className="app-description">
+          Generate comprehensive competitor lists using multiple AI models
+        </p>
       </header>
-      
-      <main>
+
+      {/* Error display for API Key issues */}
       {apiKeyStatus.checked && !apiKeyStatus.valid && (
-        <div className="api-key-warning">
-          <h3>⚠️ API Key Issue</h3>
-          <p>{apiKeyStatus.message || 'Your OpenRouter API key is missing or invalid.'}</p>
-          <p>Please set a valid REACT_APP_OPENROUTER_API_KEY in your environment.</p>
-          <p>Get a key from: <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">https://openrouter.ai/keys</a></p>
-        </div>
+        <ErrorDisplay message={apiKeyStatus.message || 'API key validation failed'} />
       )}
-      
-      <InputForm
+
+      {/* Input form */}
+      <InputForm 
         input={input}
         setInput={setInput}
         companyDescription={companyDescription}
@@ -637,302 +802,286 @@ function App() {
         setLongListCount={setLongListCount}
         shortListCount={shortListCount}
         setShortListCount={setShortListCount}
+        onSubmit={handleSubmit}
+        isLoading={isLoading}
         fastMode={fastMode}
         setFastMode={setFastMode}
         testMode={testMode}
         setTestMode={setTestMode}
-        reportMode={reportMode}
-        setReportMode={setReportMode}
+        controlSet={controlSet}
+        setControlSet={setControlSet}
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
+        reportMode={reportMode}
+        setReportMode={setReportMode}
         selectedRegion={selectedRegion}
         setSelectedRegion={setSelectedRegion}
         selectedCategories={selectedCategories}
         setSelectedCategories={setSelectedCategories}
-        onSubmit={handleSubmit}
-        isLoading={isLoading}
       />
-        
-        {isLoading && (
-          <LoadingIndicator 
-            message="Querying LLMs..." 
-            progress={progress} 
-          />
-        )}
-        
-        {error && <ErrorDisplay message={error} />}
-        
-        {rawResults && !normalizedResults && (
-          <div className="normalization-section">
-            <div className="normalization-header">
-              <div className="icon-circle">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <polyline points="19 12 12 19 5 12"></polyline>
-                </svg>
-              </div>
-              <div className="normalization-text">
-                <h2>Raw Results Collected</h2>
-                <p>Data collected from LLMs. Click below to normalize and find the most common items.</p>
-              </div>
+
+      {/* Previous Companies */}
+      <PreviousCompanies 
+        companies={previousCompanies}
+        onSelect={handleNewCompany}
+      />
+
+      {/* Loading indicator */}
+      {isLoading && <LoadingIndicator progress={progress} />}
+      
+      {/* Error display */}
+      {error && <ErrorDisplay message={error} />}
+      {reportError && <ErrorDisplay message={reportError} />}
+
+      {/* Results section */}
+      {rawResults && !isNormalizing && (
+        <div className="normalization-section">
+          <div className="normalization-header">
+            <div className="icon-circle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <polyline points="19 12 12 19 5 12"></polyline>
+              </svg>
             </div>
-            
-            <button 
-              onClick={handleNormalize} 
-              disabled={isNormalizing} 
-              className="normalize-button"
-            >
-              {isNormalizing ? (
-                <>
-                  <span className="spinner-small"></span>
-                  Normalizing...
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h13l4-3.5L18 6z"></path>
-                    <path d="M12 13v9"></path>
-                    <path d="M5 13v9"></path>
-                    <path d="M19 13v9"></path>
-                  </svg>
-                  Normalize Results
-                </>
-              )}
-            </button>
-            
-            {isNormalizing && (
-              <LoadingIndicator message="Normalizing results..." />
+            <div className="normalization-text">
+              <h2>Raw Results Collected</h2>
+              <p>Data collected from LLMs. Click below to normalize and find the most common items.</p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={handleNormalize} 
+            disabled={isNormalizing} 
+            className="normalize-button"
+          >
+            {isNormalizing ? (
+              <>
+                <span className="spinner-small"></span>
+                Normalizing...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 6H5a2 2 0 0 0-2 2v3a2 2 0 0 0 2 2h13l4-3.5L18 6z"></path>
+                  <path d="M12 13v9"></path>
+                  <path d="M5 13v9"></path>
+                  <path d="M19 13v9"></path>
+                </svg>
+                Normalize Results
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
+      {/* Preprocessing Report Button */}
+      {normalizedResults && !isProcessingReport && !showReportResults && !showCompetitorReport && (
+        <div className="normalization-section">
+          <div className="normalization-header">
+            <div className="icon-circle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path>
+              </svg>
+            </div>
+            <div className="normalization-text">
+              <h2>Results Normalized</h2>
+              <p>Results have been normalized. Click below to generate a report with company summaries.</p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={handlePreProcessReport} 
+            disabled={isProcessingReport}
+            className="process-report-button"
+          >
+            {isProcessingReport ? (
+              <>
+                <span className="spinner-small"></span>
+                Processing...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Pre-Process Report
+              </>
+            )}
+          </button>
+        </div>
+      )}
+      
+      {/* Generate Competitor Report Button */}
+      {reportResults && !isGeneratingCompetitorReport && showReportResults && !showCompetitorReport && (
+        <div className="normalization-section">
+          <div className="normalization-header">
+            <div className="icon-circle">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="16" y1="13" x2="8" y2="13"></line>
+                <line x1="16" y1="17" x2="8" y2="17"></line>
+                <polyline points="10 9 9 9 8 9"></polyline>
+              </svg>
+            </div>
+            <div className="normalization-text">
+              <h2>Report Data Generated</h2>
+              <p>Competitor data summarized. Click below to generate a comprehensive VC-style analysis report.</p>
+            </div>
+          </div>
+          
+          <button 
+            onClick={handleGenerateCompetitorReport} 
+            disabled={isGeneratingCompetitorReport}
+            className="generate-report-button"
+          >
+            {isGeneratingCompetitorReport ? (
+              <>
+                <span className="spinner-small"></span>
+                Generating VC Report...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                  <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+                Generate VC-Style Report
+              </>
+            )}
+          </button>
+        </div>
+      )}
+      
+      {/* Normalization indicator */}
+      {isNormalizing && (
+        <LoadingIndicator message="Normalizing results..." />
+      )}
+
+      {/* Report Processing indicator */}
+      {isProcessingReport && (
+        <div className="report-processing-container">
+          <h3>Pre-Processing Report</h3>
+          <div className="report-progress-status">
+            {reportProgress.status === 'validating' && (
+              <>
+                <span className="progress-icon">🔍</span>
+                <span>Validating companies with Google Gemini...</span>
+              </>
+            )}
+            {reportProgress.status === 'summarizing' && (
+              <>
+                <span className="progress-icon">📝</span>
+                <span>Generating company summaries...</span>
+              </>
+            )}
+            {reportProgress.status === 'complete' && (
+              <>
+                <span className="progress-icon">✅</span>
+                <span>Processing complete!</span>
+              </>
             )}
           </div>
-        )}
-        
-        {normalizedResults && (
+          <div className="report-progress-bar-container">
+            <div 
+              className="report-progress-bar" 
+              style={{width: `${reportProgress.progress || 0}%`}}
+            ></div>
+          </div>
+        </div>
+      )}
+      
+      {/* Competitor Report Processing indicator */}
+      {isGeneratingCompetitorReport && (
+        <div className="report-processing-container">
+          <h3>Generating VC-Style Competitor Report</h3>
+          <div className="report-progress-status">
+            {competitorReportProgress.status === 'generating' && (
+              <>
+                <span className="progress-icon">📊</span>
+                <span>Using Google Gemini to analyze and generate report...</span>
+              </>
+            )}
+            {competitorReportProgress.status === 'complete' && (
+              <>
+                <span className="progress-icon">✅</span>
+                <span>Report generated successfully!</span>
+              </>
+            )}
+          </div>
+          <div className="report-progress-bar-container">
+            <div 
+              className="report-progress-bar" 
+              style={{width: `${competitorReportProgress.progress || 0}%`}}
+            ></div>
+          </div>
+        </div>
+      )}
+
+      {/* Show normalized results */}
+      {normalizedResults && !showReportResults && !showCompetitorReport && (
+        <div className="results-container">
           <ResultsTable 
-            categorizedResults={categorizedResults} 
-            normalizedRawResults={normalizedResults.rawData} // Pass the categorized raw data
+            categorizedResults={categorizedResults}
+            normalizedRawResults={normalizedResults.rawData}
             categoryInfo={{
-              incumbent: { label: 'Incumbents', icon: '🏢', shortListCount: shortListCount },
-              regional: { label: 'Regional Players', icon: '🌎', shortListCount: 5 },
-              interesting: { label: 'Interesting Cases', icon: '💡', shortListCount: 3 },
-              graveyard: { label: 'Graveyard', icon: '⚰️', shortListCount: 3 }
+              incumbent: { shortListCount: shortListCount },
+              regional: { shortListCount: 5 },
+              interesting: { shortListCount: 3 },
+              graveyard: { shortListCount: 3 }
             }}
           />
-        )}
-
-        {/* Recalculated Results */}
-        {recalculatedResults && (
-          <div className="recalculated-results-section">
-            <h3 className="recalculated-results-header">
-              Recalculated Results ({countSelectedMetricsModels()} Models)
-            </h3>
-            
-            <div className="recalculated-metrics">
-              {recalculatedResults.metrics && recalculatedResults.metrics.overall && (
-                <div className="recalculated-metrics-summary">
-                  <div className="recalculated-metric">
-                    <span className="recalculated-metric-label">Precision:</span>
-                    <span className="recalculated-metric-value">{recalculatedResults.metrics.overall.precision}%</span>
-                  </div>
-                  <div className="recalculated-metric">
-                    <span className="recalculated-metric-label">Recall:</span>
-                    <span className="recalculated-metric-value">{recalculatedResults.metrics.overall.recall}%</span>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <ResultsTable 
-              categorizedResults={recalculatedResults.categorizedSummary} // Need to update recalculation logic
-              normalizedRawResults={recalculatedResults.rawData} // Pass the categorized raw data
-            />
-          </div>
-        )}
-
-        {/* LLM Metrics Section - only show in test mode with control set */}
-        {testMode && normalizedResults && Object.keys(llmMetrics).length > 0 && (
-          <div className="model-metrics-section">
-            <div className="collapsible-header metrics-header" onClick={toggleModelMetrics}>
-              <h3>LLM Model Performance Metrics</h3>
-              <button 
-                type="button" 
-                className="toggle-collapse-button"
-              >
-                {showModelMetrics ? '▲' : '▼'}
-              </button>
-            </div>
-            
-            {showModelMetrics && (
-              <div className="model-metrics-container">
-                <p className="metrics-explanation">
-                  Precision: percentage of model's results that match the control set<br />
-                  Recall: percentage of control set items found by the model
-                </p>
-                
-                <div className="metrics-selection-actions">
-                  <button 
-                    type="button" 
-                    onClick={() => handleSelectAllMetricsModels(true)}
-                    className="metrics-action-button"
-                    disabled={isRecalculating}
-                  >
-                    Select All
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={() => handleSelectAllMetricsModels(false)}
-                    className="metrics-action-button"
-                    disabled={isRecalculating}
-                  >
-                    Deselect All
-                  </button>
-                  <button 
-                    type="button" 
-                    onClick={handleRecalculate}
-                    className="metrics-recalculate-button"
-                    disabled={isRecalculating || countSelectedMetricsModels() === 0}
-                  >
-                    {isRecalculating ? (
-                      <>
-                        <span className="spinner-small"></span>
-                        Recalculating...
-                      </>
-                    ) : (
-                      "Recalculate with Selected Models"
-                    )}
-                  </button>
-                </div>
-                
-                <div className="model-metrics-table-container">
-                  <table className="model-metrics-table">
-                    <thead>
-                      <tr>
-                        <th>Use</th>
-                        <th>Model</th>
-                        <th>Precision</th>
-                        <th>Recall</th>
-                        <th>Items Found</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(llmMetrics)
-                        .sort((a, b) => {
-                          // Sort by highest F1 score (harmonic mean of precision and recall)
-                          const f1A = a[1].precision * a[1].recall > 0 
-                            ? 2 * (a[1].precision * a[1].recall) / (a[1].precision + a[1].recall)
-                            : 0;
-                          const f1B = b[1].precision * b[1].recall > 0
-                            ? 2 * (b[1].precision * b[1].recall) / (b[1].precision + b[1].recall)
-                            : 0;
-                          return f1B - f1A;
-                        })
-                        .map(([model, metrics]) => (
-                          <tr key={model} className={metricsModelSelection[model] ? 'selected-model' : 'deselected-model'}>
-                            <td className="model-toggle-cell">
-                              <input
-                                type="checkbox"
-                                checked={!!metricsModelSelection[model]}
-                                onChange={() => handleMetricsModelToggle(model)}
-                                disabled={isRecalculating}
-                                id={`metrics-model-${model}`}
-                              />
-                            </td>
-                            <td>{model.split('/')[0]}/{model.split('/')[1].split(':')[0]}</td>
-                            <td>
-                              <div className="metric-value-cell">
-                                <div className="metric-bar" style={{ width: `${metrics.precision}%` }}></div>
-                                <span>{metrics.precision}%</span>
-                              </div>
-                            </td>
-                            <td>
-                              <div className="metric-value-cell">
-                                <div className="metric-bar" style={{ width: `${metrics.recall}%` }}></div>
-                                <span>{metrics.recall}%</span>
-                              </div>
-                            </td>
-                            <td>{metrics.itemCount}</td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-                
-                <div className="metrics-insights">
-                  <h4>Performance Insights</h4>
-                  <ul>
-                    {Object.entries(llmMetrics)
-                      .sort((a, b) => b[1].precision - a[1].precision)
-                      .slice(0, 1)
-                      .map(([model, metrics]) => (
-                        <li key={`precision-${model}`}>
-                          <strong>Highest Precision:</strong> {model.split('/')[0]}/{model.split('/')[1].split(':')[0]} ({metrics.precision}%)
-                        </li>
-                      ))}
-                    {Object.entries(llmMetrics)
-                      .sort((a, b) => b[1].recall - a[1].recall)
-                      .slice(0, 1)
-                      .map(([model, metrics]) => (
-                        <li key={`recall-${model}`}>
-                          <strong>Highest Recall:</strong> {model.split('/')[0]}/{model.split('/')[1].split(':')[0]} ({metrics.recall}%)
-                        </li>
-                      ))}
-                    {Object.entries(llmMetrics)
-                      .sort((a, b) => {
-                        // Sort by highest F1 score
-                        const f1A = a[1].precision * a[1].recall > 0 
-                          ? 2 * (a[1].precision * a[1].recall) / (a[1].precision + a[1].recall)
-                          : 0;
-                        const f1B = b[1].precision * b[1].recall > 0
-                          ? 2 * (b[1].precision * b[1].recall) / (b[1].precision + b[1].recall)
-                          : 0;
-                        return f1B - f1A;
-                      })
-                      .slice(0, 1)
-                      .map(([model, metrics]) => {
-                        const f1 = metrics.precision * metrics.recall > 0
-                          ? Math.round(2 * (metrics.precision * metrics.recall) / (metrics.precision + metrics.recall))
-                          : 0;
-                        return (
-                          <li key={`f1-${model}`}>
-                            <strong>Best Overall (F1):</strong> {model.split('/')[0]}/{model.split('/')[1].split(':')[0]} (F1 Score: {f1}%)
-                          </li>
-                        );
-                      })}
-                  </ul>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-        
-        {/* Only show ControlSetEvaluation in test mode and not in report mode */}
-        {testMode && !reportMode && normalizedResults && controlSet && (
-          <ControlSetEvaluation controlSet={controlSet} normalizedResults={normalizedResults} />
-        )}
-
-        {/* Add the PreviousCompanies component before the footer */}
-        {previousCompanies.length > 0 && (
-          <PreviousCompanies companies={previousCompanies} />
-        )}
-        
-        {normalizedResults && (
-          <div className="new-company-section">
+        </div>
+      )}
+      
+      {/* Report Results */}
+      {showReportResults && filteredReportResults && !showCompetitorReport && (
+        <>
+          <ReportResultsTable 
+            results={filteredReportResults.results}
+            stats={filteredReportResults.stats}
+            onUpdateResults={handleUpdateReportResults}
+          />
+          <div className="report-actions-container">
             <button 
-              onClick={handleNewCompany} 
-              className="new-company-button"
+              className="back-to-results-button"
+              onClick={() => setShowReportResults(false)}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Analyse New Company
+              Back to Competitor Results
             </button>
           </div>
-        )}
-      </main>
+        </>
+      )}
       
-      <footer className="app-footer">
-        <p>Powered by OpenRouter API • {reportMode ? 'Report Mode' : ''} Using {selectedModels.length} different LLMs{testMode && !reportMode ? ' • Test Mode Active' : ''}</p>
-      </footer>
+      {/* Competitor Report */}
+      {showCompetitorReport && competitorReport && (
+        <>
+          <CompetitorReport
+            reportContent={competitorReport}
+            companyName={input}
+            onSave={handleSaveCompetitorReport}
+          />
+          <div className="report-actions-container">
+            <button 
+              className="back-to-results-button"
+              onClick={() => {
+                setShowCompetitorReport(false);
+                setShowReportResults(true);
+              }}
+            >
+              Back to Report Results
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

@@ -1,0 +1,279 @@
+.report-results-container {
+  margin-top: var(--space-6);
+  background-color: white;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-200);
+  padding: var(--space-6);
+}
+
+.report-header {
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--neutral-200);
+  padding-bottom: var(--space-4);
+}
+
+.report-header h2 {
+  font-size: 1.5rem;
+  margin: 0;
+  color: var(--neutral-900);
+}
+
+.report-subtitle {
+  color: var(--neutral-600);
+  margin-top: var(--space-1);
+  margin-bottom: 0;
+}
+
+.report-stats {
+  margin-bottom: var(--space-6);
+}
+
+.report-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.report-stat-card {
+  background-color: var(--neutral-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-200);
+  padding: var(--space-4);
+}
+
+.stat-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-3);
+  gap: var(--space-2);
+}
+
+.stat-icon {
+  font-size: 1.2rem;
+}
+
+.stat-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--neutral-800);
+}
+
+.stat-numbers {
+  display: flex;
+  justify-content: space-between;
+}
+
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--neutral-600);
+}
+
+.report-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--space-6);
+}
+
+.copy-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--neutral-100);
+  border: 1px solid var(--neutral-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: var(--space-6);
+}
+
+.copy-button:hover {
+  background-color: var(--neutral-200);
+}
+
+.copy-button.success {
+  background-color: var(--success);
+  color: white;
+  border-color: var(--success);
+}
+
+.report-results-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.report-section {
+  border-top: 1px solid var(--neutral-200);
+  padding-top: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.report-section-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: var(--space-4);
+  gap: var(--space-2);
+}
+
+.section-icon {
+  font-size: 1.2rem;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--neutral-800);
+}
+
+.section-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background-color: var(--neutral-200);
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-left: var(--space-2);
+}
+
+.report-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.report-table th {
+  text-align: left;
+  padding: var(--space-3);
+  border-bottom: 2px solid var(--neutral-300);
+  font-weight: 600;
+  color: var(--neutral-700);
+}
+
+.report-table td {
+  padding: var(--space-3);
+  border-bottom: 1px solid var(--neutral-200);
+  vertical-align: top;
+}
+
+.company-cell {
+  width: 30%;
+  font-weight: 500;
+}
+
+.description-cell {
+  width: 60%;
+}
+
+.action-column {
+  width: 10%;
+  text-align: center;
+}
+
+.action-cell {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.remove-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--neutral-100);
+  border: 1px solid var(--neutral-300);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  margin: 0 auto;
+}
+
+.remove-button:hover {
+  background-color: var(--danger-50);
+  border-color: var(--danger);
+}
+
+.remove-button:hover svg {
+  stroke: var(--danger);
+}
+
+.remove-button svg {
+  stroke: var(--neutral-600);
+  transition: stroke 0.2s ease;
+}
+
+.company-description {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--neutral-700);
+}
+
+.empty-report-message {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--neutral-600);
+  background-color: var(--neutral-50);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-200);
+  margin-top: var(--space-6);
+}
+
+/* Actions container styles */
+.report-actions-container {
+  display: flex;
+  justify-content: center;
+  margin-top: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+.back-to-results-button {
+  padding: var(--space-2) var(--space-4);
+  background-color: var(--neutral-100);
+  border: 1px solid var(--neutral-300);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-to-results-button:hover {
+  background-color: var(--neutral-200);
+}
+
+.generate-report-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.generate-report-button:hover {
+  background-color: var(--primary-dark);
+} 

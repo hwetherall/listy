@@ -64,6 +64,62 @@ const extractJsonFromResponse = (content) => {
 };
 
 /**
+ * Remove duplicate companies across categories based on priority rules
+ * Priority order: Incumbent > Regional > Interesting > Graveyard
+ */
+const deduplicateAcrossCategories = (normalizedResults) => {
+  // Define priority order for categories
+  const categoryPriority = {
+    'incumbent': 1,
+    'regional': 2,
+    'interesting': 3,
+    'graveyard': 4
+  };
+  
+  // Keep track of companies we've seen and their categories
+  const seenCompanies = new Map();
+  
+  // First pass: identify all normalized companies and their categories
+  Object.entries(normalizedResults).forEach(([category, modelData]) => {
+    if (!modelData || !modelData.items || !Array.isArray(modelData.items)) return;
+    
+    modelData.items.forEach(company => {
+      if (!company) return;
+      
+      const normalizedCompany = company.trim();
+      
+      // If we haven't seen this company before or current category has higher priority
+      if (!seenCompanies.has(normalizedCompany) || 
+          categoryPriority[category] < categoryPriority[seenCompanies.get(normalizedCompany)]) {
+        seenCompanies.set(normalizedCompany, category);
+      }
+    });
+  });
+  
+  // Second pass: filter out companies that should be in a different category
+  const dedupedResults = {};
+  Object.entries(normalizedResults).forEach(([category, modelData]) => {
+    if (!modelData || !modelData.items || !Array.isArray(modelData.items)) {
+      dedupedResults[category] = modelData;
+      return;
+    }
+    
+    dedupedResults[category] = {
+      ...modelData,
+      items: modelData.items.filter(company => {
+        if (!company) return false;
+        
+        const normalizedCompany = company.trim();
+        // Keep the company if it belongs in this category based on priority
+        return seenCompanies.get(normalizedCompany) === category;
+      })
+    };
+  });
+  
+  return dedupedResults;
+};
+
+/**
  * Normalize the results using the Normalizer LLM
  */
 export const normalizeResults = async (results) => {
@@ -164,7 +220,25 @@ export const normalizeResults = async (results) => {
       };
     });
     
-    return normalizedResults;
+    // Apply cross-category deduplication based on priority rules
+    const dedupedResults = deduplicateAcrossCategories(normalizedResults);
+    
+    // Log before and after counts to verify deduplication
+    console.log("Before deduplication (items per category):", 
+      Object.entries(normalizedResults).reduce((acc, [cat, data]) => {
+        acc[cat] = data.items ? data.items.length : 0;
+        return acc;
+      }, {})
+    );
+    
+    console.log("After deduplication (items per category):", 
+      Object.entries(dedupedResults).reduce((acc, [cat, data]) => {
+        acc[cat] = data.items ? data.items.length : 0;
+        return acc;
+      }, {})
+    );
+    
+    return dedupedResults;
   } catch (error) {
     console.error('Normalization error:', error);
     throw new Error(`Normalization failed: ${error.message}`);
