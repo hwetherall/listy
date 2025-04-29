@@ -1,6 +1,9 @@
+// Import the custom environment variables
+import env from '../utils/customEnv';
+
 // List of LLM models to query
 export const LLM_MODELS = [
-    'microsoft/mai-ds-r1:free',
+  // 'microsoft/mai-ds-r1:free', // Removed - slow and ineffectual
     // 'google/gemini-2.5-pro-exp-03-25:free', // Removed due to consistent errors and duplicate provider
     'openai/gpt-4o-search-preview',
     'anthropic/claude-3.7-sonnet',
@@ -23,13 +26,13 @@ export const LLM_MODELS = [
     'google/gemma-3-27b-it'
   ];
   
-  // Get API key from environment variables
-  const API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY;
-  const BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
+  // Get API key and base URL from the custom env utility
+  const API_KEY = env.OPENROUTER_API_KEY;
+  const BASE_URL = env.OPENROUTER_BASE_URL;
   
-  // New prompt generators for specialized competitor categories with refinements
+  // Export prompt generators for specialized competitor categories
 
-  const generateIncumbentPrompt = (companyName, companyDescription, count) => {
+  export const generateIncumbentPrompt = (companyName, companyDescription, count) => {
     return `You are a competitive intelligence expert specializing in market research. Your task is to generate a list of up to ${count} INCUMBENT companies that directly compete with "${companyName}".
 
 Additional company context: ${companyDescription}
@@ -49,7 +52,7 @@ Please follow these guidelines:
 Your list of incumbent competitors to "${companyName}":`;
   };
 
-  const generateRegionalPrompt = (companyName, companyDescription, count) => {
+  export const generateRegionalPrompt = (companyName, companyDescription, count) => {
     // Note: This version assumes the AI should *infer* the region from the description.
     // If you can pass the region(s) explicitly, modify this function to accept and use them.
     return `You are a competitive intelligence expert focusing on regional market analysis. For the company "${companyName}", identify up to ${count} REGION-SPECIFIC competitors.
@@ -74,7 +77,7 @@ Please follow these guidelines:
 Your list of regional competitors to "${companyName}":`;
   };
 
-  const generateInterestingPrompt = (companyName, companyDescription, count) => {
+  export const generateInterestingPrompt = (companyName, companyDescription, count) => {
     return `You are a competitive intelligence expert focusing on unique business models and market dynamics. For the company "${companyName}", identify up to ${count} INTERESTING competitors.
 
 Additional company context: ${companyDescription}
@@ -97,7 +100,7 @@ Please follow these guidelines:
 Your list of interesting competitors to "${companyName}":`;
   };
 
-  const generateGraveyardPrompt = (companyName, companyDescription, count) => {
+  export const generateGraveyardPrompt = (companyName, companyDescription, count) => {
     return `You are a competitive intelligence expert focusing on market history. For the company "${companyName}", identify up to ${count} FORMER competitors.
 
 Additional company context: ${companyDescription}
@@ -120,18 +123,46 @@ Please follow these guidelines:
 Your list of former competitors to "${companyName}":`;
   };
   
+  // Export region-specific prompt generator for report mode
+  export const generateRegionSpecificPrompt = (companyName, companyDescription, region, count) => {
+    return `You are a competitive intelligence expert focusing on regional market analysis. For the company "${companyName}", identify up to ${count} REGION-SPECIFIC competitors in ${region}.
+
+Additional company context: ${companyDescription}
+
+For REGIONAL PLAYERS in ${region}, focus on:
+1. Companies that operate primarily in ${region} rather than globally
+2. Local alternatives to ${companyName} within ${region}
+3. Region-specific competitors with strong local presence in ${region}
+4. Companies that may be large in ${region} but less known globally
+
+Please follow these guidelines:
+1. List exactly ${count} distinct regional competitors in ${region}
+2. Format your response as a numbered list (1., 2., 3., etc.)
+3. List ONLY the company name (e.g., "Grab" not "Grab - Southeast Asian ride-hailing")
+4. Only provide the list - no explanations or introductions
+
+Your list of ${region} regional competitors to "${companyName}":`;
+  };
+  
   /**
    * Parse numbered list from LLM response
    */
   const parseNumberedList = (content) => {
     if (!content) return [];
     
+    console.log("Content to parse:", content);
+    
     // Regular expression to match numbered list items
     // This handles different numbering formats (1., 1), etc.
     const regex = /\d+[\.\)]\s*(.*?)(?=\n\d+[\.\)]|\n\n|$)/gs;
     const matches = [...content.matchAll(regex)];
     
-    return matches.map(match => match[1].trim());
+    console.log("Matches found:", matches.length);
+    
+    const result = matches.map(match => match[1].trim());
+    console.log("Parsed items:", result);
+    
+    return result;
   };
   
   /**
@@ -139,8 +170,16 @@ Your list of former competitors to "${companyName}":`;
    */
   const queryLLM = async (model, prompt, updateProgress, category = '') => {
     try {
-      // Update progress status with category if provided
-      updateProgress(model, 'requesting', 0, category);
+      // Update progress status
+      updateProgress('requesting', 0);
+      
+      // Check if API key is available
+      if (!API_KEY) {
+        throw new Error('No OpenRouter API key available. Please provide REACT_APP_OPENROUTER_API_KEY in your environment.');
+      }
+      
+      // Debug API key being used
+      console.log(`Querying ${model} with API key (first 10 chars): ${API_KEY.substring(0, 10)}...`);
       
       // Start timing
       const startTime = Date.now();
@@ -173,11 +212,13 @@ Your list of former competitors to "${companyName}":`;
       // Calculate response time in seconds (rounded to 2 decimal places)
       const responseTime = ((Date.now() - startTime) / 1000).toFixed(2);
       
+      console.log(`Raw response from ${model}:`, data);
+      
       // Add check for valid choices array
       if (!data.choices || data.choices.length === 0 || !data.choices[0].message || !data.choices[0].message.content) {
         const errorMessage = `Invalid response structure from ${model}: Missing expected content.`;
         console.error(`Error querying ${model}:`, errorMessage, data); // Log the actual data received
-        updateProgress(model, 'error', responseTime, category);
+        updateProgress('error', responseTime);
         return {
           model,
           error: errorMessage,
@@ -186,18 +227,21 @@ Your list of former competitors to "${companyName}":`;
         };
       }
 
-      updateProgress(model, 'success', responseTime, category);
+      updateProgress('success', responseTime);
+      
+      const responseContent = data.choices[0].message.content;
+      console.log(`Response content from ${model}:`, responseContent);
       
       return {
         model,
-        content: data.choices[0].message.content,
+        content: responseContent,
         responseTime
       };
     } catch (error) {
       console.error(`Error querying ${model}:`, error);
       // Try to get responseTime even in error, although it might be 0
       const responseTimeOnError = (error.responseTime !== undefined) ? error.responseTime : 0;
-      updateProgress(model, 'error', responseTimeOnError, category);
+      updateProgress('error', responseTimeOnError);
       
       return {
         model,
@@ -217,14 +261,28 @@ Your list of former competitors to "${companyName}":`;
     longListCount, 
     updateProgress = () => {},
     fastMode = false,
-    customModels = null
+    customModels = null,
+    specificCategory = null,
+    specificPrompt = null
   ) => {
+    // Check if API key is available
+    if (!API_KEY) {
+      throw new Error('No OpenRouter API key available. Please provide REACT_APP_OPENROUTER_API_KEY in your environment.');
+    }
+
     // Generate prompts for each category
-    const incumbentPrompt = generateIncumbentPrompt(companyName, companyDescription, longListCount);
-    const regionalPrompt = generateRegionalPrompt(companyName, companyDescription, 10);
-    const interestingPrompt = generateInterestingPrompt(companyName, companyDescription, 10);
-    const graveyardPrompt = generateGraveyardPrompt(companyName, companyDescription, 10);
-  
+    const incumbentPrompt = specificCategory === 'incumbent' && specificPrompt ? 
+      specificPrompt : generateIncumbentPrompt(companyName, companyDescription, longListCount);
+      
+    const regionalPrompt = specificCategory === 'regional' && specificPrompt ? 
+      specificPrompt : generateRegionalPrompt(companyName, companyDescription, 10);
+      
+    const interestingPrompt = specificCategory === 'interesting' && specificPrompt ? 
+      specificPrompt : generateInterestingPrompt(companyName, companyDescription, 10);
+      
+    const graveyardPrompt = specificCategory === 'graveyard' && specificPrompt ? 
+      specificPrompt : generateGraveyardPrompt(companyName, companyDescription, 10);
+
     // Determine which models to use
     let selectedModels;
     
@@ -236,29 +294,109 @@ Your list of former competitors to "${companyName}":`;
       selectedModels = LLM_MODELS;
     }
     
-    // Make requests to all LLMs for all categories in parallel
+    // Process responses by category helper function
+    const processCategory = (responses, category) => {
+      const results = {};
+      let successCount = 0;
+      
+      console.log(`Processing ${responses.length} responses for category ${category}`);
+      
+      responses.forEach((response, index) => {
+        const { model, content, error, responseTime } = response;
+        
+        console.log(`Response from ${model} for ${category}:`, { 
+          hasContent: !!content, 
+          contentLength: content ? content.length : 0,
+          error 
+        });
+        
+        if (content) {
+          const items = parseNumberedList(content);
+          console.log(`Extracted ${items.length} items from ${model} for ${category}`);
+          results[model] = {
+            items,
+            category,
+            error: null,
+            responseTime,
+          };
+          successCount++;
+        } else {
+          console.log(`No content to extract items from ${model} for ${category}`);
+          results[model] = {
+            items: [],
+            category,
+            error,
+            responseTime: responseTime || 0
+          };
+        }
+      });
+      
+      console.log(`Successfully processed ${successCount} responses for ${category}`);
+      console.log(`Results structure for ${category}:`, results);
+      
+      return { results, successCount };
+    };
+
+    // If a specific category is requested, only query for that category
+    if (specificCategory) {
+      let categoryPrompt;
+      
+      switch(specificCategory) {
+        case 'incumbent':
+          categoryPrompt = incumbentPrompt;
+          break;
+        case 'regional':
+          categoryPrompt = regionalPrompt;
+          break;
+        case 'interesting':
+          categoryPrompt = interestingPrompt;
+          break;
+        case 'graveyard':
+          categoryPrompt = graveyardPrompt;
+          break;
+        default:
+          throw new Error(`Unknown category: ${specificCategory}`);
+      }
+      
+      const promises = selectedModels.map(model => 
+        queryLLM(model, categoryPrompt, (status, responseTime) => {
+          updateProgress(model, status, responseTime);
+        }, specificCategory)
+      );
+      
+      const responses = await Promise.all(promises);
+      const { results } = processCategory(responses, specificCategory);
+      
+      // Return results structured the same way as the full query
+      const combinedResults = {};
+      combinedResults[specificCategory] = results;
+      
+      return combinedResults;
+    }
+    
+    // Otherwise, make requests to all LLMs for all categories in parallel
     const incumbentPromises = selectedModels.map(model => 
       queryLLM(model, incumbentPrompt, (status, responseTime) => {
-        updateProgress(model, status, responseTime, 'incumbent');
-      })
+        updateProgress(model, status, responseTime);
+      }, 'incumbent')
     );
 
     const regionalPromises = selectedModels.map(model => 
       queryLLM(model, regionalPrompt, (status, responseTime) => {
-        updateProgress(model, status, responseTime, 'regional');
-      })
+        updateProgress(model, status, responseTime);
+      }, 'regional')
     );
 
     const interestingPromises = selectedModels.map(model => 
       queryLLM(model, interestingPrompt, (status, responseTime) => {
-        updateProgress(model, status, responseTime, 'interesting');
-      })
+        updateProgress(model, status, responseTime);
+      }, 'interesting')
     );
 
     const graveyardPromises = selectedModels.map(model => 
       queryLLM(model, graveyardPrompt, (status, responseTime) => {
-        updateProgress(model, status, responseTime, 'graveyard');
-      })
+        updateProgress(model, status, responseTime);
+      }, 'graveyard')
     );
     
     // Wait for all promises to resolve
@@ -269,36 +407,6 @@ Your list of former competitors to "${companyName}":`;
         Promise.all(interestingPromises),
         Promise.all(graveyardPromises)
       ]);
-    
-    // Process all responses by category
-    const processCategory = (responses, category) => {
-      const results = {};
-      let successCount = 0;
-      
-      responses.forEach((response, index) => {
-        const { model, content, error, responseTime } = response;
-        
-        if (content) {
-          const items = parseNumberedList(content);
-          results[model] = {
-            items,
-            category,
-            error: null,
-            responseTime,
-          };
-          successCount++;
-        } else {
-          results[model] = {
-            items: [],
-            category,
-            error,
-            responseTime: responseTime || 0
-          };
-        }
-      });
-      
-      return { results, successCount };
-    };
     
     const { results: incumbentResults, successCount: incumbentSuccess } = 
       processCategory(incumbentResponses, 'incumbent');

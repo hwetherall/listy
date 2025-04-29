@@ -1,6 +1,9 @@
-// Get API key from environment variables
-const API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY;
-const BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// Import the custom environment variables
+import env from '../utils/customEnv';
+
+// Get API key and base URL from the custom env utility
+const API_KEY = env.OPENROUTER_API_KEY;
+const BASE_URL = env.OPENROUTER_BASE_URL;
 
 // Use a different free model for normalization as Google model was causing errors
 // Trying Mistral Small for potentially better speed
@@ -65,26 +68,35 @@ const extractJsonFromResponse = (content) => {
  */
 export const normalizeResults = async (results) => {
   // Extract items from the nested structure of results
-  // The results have a format: { incumbent: { modelName: { items: [...] } }, regional: {...}, ... }
   const allItems = [];
   
-  // Process each category
-  Object.values(results).forEach(categoryData => {
-    // Process each model within the category
-    Object.values(categoryData).forEach(modelData => {
-      if (modelData && modelData.items) {
-        // Add each item from this model to the combined list
-        modelData.items.forEach(item => {
-          if (item && item.trim()) {
-            allItems.push(item.trim());
-          }
-        });
-      }
-    });
+  console.log("Raw results structure received for normalization:", JSON.stringify(results, null, 2));
+  
+  // Updated processing logic to directly handle the model structure
+  Object.entries(results).forEach(([modelName, modelData]) => {
+    console.log(`Processing model: ${modelName}`);
+    
+    if (modelData && modelData.items) {
+      console.log(`Found ${modelData.items.length} items for model ${modelName}`);
+      
+      // Add each item from this model to the combined list
+      modelData.items.forEach(item => {
+        if (item && item.trim()) {
+          allItems.push(item.trim());
+        }
+      });
+    } else {
+      console.log(`No items array found for model ${modelName} or it's empty`);
+    }
   });
+  
+  console.log("All extracted items:", allItems);
   
   // Remove duplicates for the normalization prompt
   const uniqueItems = [...new Set(allItems)];
+  
+  console.log("Unique items for normalization:", uniqueItems);
+  console.log("Unique items count:", uniqueItems.length);
   
   if (uniqueItems.length === 0) {
     throw new Error('No valid items to normalize');
@@ -138,23 +150,18 @@ export const normalizeResults = async (results) => {
     // Log the parsed normalization map
     console.log("Parsed Normalization Map:", normalizationMap);
 
-    // Apply normalization to all results, maintaining the nested structure
+    // Apply normalization to all results, maintaining the structure
     const normalizedResults = {};
     
-    // Process each category
-    Object.entries(results).forEach(([category, categoryData]) => {
-      normalizedResults[category] = {};
-      
-      // Process each model within the category
-      Object.entries(categoryData).forEach(([model, modelData]) => {
-        normalizedResults[category][model] = {
-          ...modelData,
-          // Map each item to its normalized form, or keep as is if not in the map
-          items: modelData.items.map(item => 
-            item ? (normalizationMap[item.trim()] || item) : item
-          )
-        };
-      });
+    // Process each model directly
+    Object.entries(results).forEach(([modelName, modelData]) => {
+      normalizedResults[modelName] = {
+        ...modelData,
+        // Map each item to its normalized form, or keep as is if not in the map
+        items: modelData.items.map(item => 
+          item ? (normalizationMap[item.trim()] || item) : item
+        )
+      };
     });
     
     return normalizedResults;

@@ -4,13 +4,59 @@ import LoadingIndicator from './components/LoadingIndicator';
 import ResultsTable from './components/ResultsTable';
 import ErrorDisplay from './components/ErrorDisplay';
 import ControlSetEvaluation from './components/ControlSetEvaluation';
-import { queryLLMs, LLM_MODELS } from './services/llmService';
+import { 
+  queryLLMs, 
+  LLM_MODELS, 
+  generateIncumbentPrompt, 
+  generateRegionalPrompt, 
+  generateInterestingPrompt, 
+  generateGraveyardPrompt,
+  generateRegionSpecificPrompt 
+} from './services/llmService';
 import { normalizeResults } from './services/normalizationService';
 import { processResults } from './utils/resultProcessor';
 import './styles/main.css';
 import PreviousCompanies from './components/PreviousCompanies';
+import env from './utils/customEnv';
+// Import debug module
+import { checkApiKey, testApiKey } from './debug';
 
 function App() {
+  // State for API key status and validity
+  const [apiKeyStatus, setApiKeyStatus] = useState({ checked: false, valid: false, message: null });
+  
+  // Debug - check if API key is loaded
+  useEffect(() => {
+    console.log('App mounted - checking API key...');
+    const hasApiKey = checkApiKey();
+    console.log('API key available:', hasApiKey);
+    console.log('CustomEnv API key (first 10 chars):', env.OPENROUTER_API_KEY ? env.OPENROUTER_API_KEY.substring(0, 10) + '...' : 'Not available');
+    
+    // Test the API key if it exists
+    if (hasApiKey) {
+      const validateApiKey = async () => {
+        const result = await testApiKey();
+        setApiKeyStatus({
+          checked: true,
+          valid: result.success,
+          message: result.message
+        });
+        
+        if (!result.success) {
+          console.error('API key validation failed:', result.message);
+        }
+      };
+      
+      validateApiKey();
+    } else {
+      setApiKeyStatus({
+        checked: true,
+        valid: false,
+        message: 'No API key found. Please set REACT_APP_OPENROUTER_API_KEY in your environment.'
+      });
+    }
+  }, []);
+
   // State management
   const [input, setInput] = useState('');
   const [companyDescription, setCompanyDescription] = useState('');
@@ -35,7 +81,12 @@ function App() {
   const [recalculatedResults, setRecalculatedResults] = useState(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
 
-  // Add new state in App.js
+  // Add new state for Report Mode
+  const [reportMode, setReportMode] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState('');
+  const [selectedCategories, setSelectedCategories] = useState(['incumbent', 'regional', 'interesting', 'graveyard']);
+
+  // Add state in App.js for categorized results
   const [categorizedResults, setCategorizedResults] = useState({
     incumbent: [],
     regional: [],
@@ -68,6 +119,18 @@ function App() {
     }
   }, [llmMetrics]);
 
+  // Helper function to parse numbered list from LLM response 
+  const parseNumberedList = (content) => {
+    if (!content) return [];
+    
+    // Regular expression to match numbered list items
+    // This handles different numbering formats (1., 1), etc.
+    const regex = /\d+[\.\)]\s*(.*?)(?=\n\d+[\.\)]|\n\n|$)/gs;
+    const matches = [...content.matchAll(regex)];
+    
+    return matches.map(match => match[1].trim());
+  };
+
   // Submit handler - Query all LLMs
   const handleSubmit = async (controlSetData) => {
     setIsLoading(true);
@@ -84,23 +147,75 @@ function App() {
     }
     
     try {
-      const results = await queryLLMs(
-        input, 
-        companyDescription,
-        longListCount, 
-        (model, status, responseTime) => {
-          setProgress(prev => ({
-            ...prev,
-            [model]: {
-              status,
-              responseTime
+      if (reportMode) {
+        // In Report Mode, we force 10 results per category and only query selected categories
+        const reportResults = {};
+        
+        // Loop through selected categories and query LLMs
+        for (const category of selectedCategories) {
+          let categoryPrompt = '';
+          
+          // Generate the appropriate prompt for each category
+          if (category === 'incumbent') {
+            categoryPrompt = generateIncumbentPrompt(input, companyDescription, 10);
+          } else if (category === 'regional') {
+            // For regional, use the region-specific prompt
+            if (!selectedRegion) {
+              throw new Error('Region must be selected for Regional Players category');
             }
-          }));
-        },
-        fastMode, // Pass fastMode to the query function
-        selectedModels // Pass the selected models to the query function
-      );
-      setRawResults(results);
+            categoryPrompt = generateRegionSpecificPrompt(input, companyDescription, selectedRegion, 10);
+          } else if (category === 'interesting') {
+            categoryPrompt = generateInterestingPrompt(input, companyDescription, 10);
+          } else if (category === 'graveyard') {
+            categoryPrompt = generateGraveyardPrompt(input, companyDescription, 10);
+          }
+          
+          // USE THE IMPORTED queryLLMs function instead of directly querying here
+          const categoryResults = await queryLLMs(
+            input,
+            companyDescription,
+            10, // Fixed size for report mode
+            (model, status, responseTime) => {
+              setProgress(prev => ({
+                ...prev,
+                [model]: {
+                  status,
+                  responseTime,
+                  category
+                }
+              }));
+            },
+            fastMode,
+            selectedModels,
+            category, // Pass the current category
+            categoryPrompt // Pass the generated prompt
+          );
+          
+          // Store results for this category
+          reportResults[category] = categoryResults[category];
+        }
+        
+        setRawResults(reportResults);
+      } else {
+        // Standard mode - query all categories as before
+        const results = await queryLLMs(
+          input, 
+          companyDescription,
+          longListCount, 
+          (model, status, responseTime) => {
+            setProgress(prev => ({
+              ...prev,
+              [model]: {
+                status,
+                responseTime
+              }
+            }));
+          },
+          fastMode, // Pass fastMode to the query function
+          selectedModels // Pass the selected models to the query function
+        );
+        setRawResults(results);
+      }
     } catch (err) {
       setError(err.message || 'An error occurred while querying LLMs');
     } finally {
@@ -116,46 +231,139 @@ function App() {
     setError(null);
     
     try {
-      // First normalize all results together to identify duplicates across categories
-      const normalizedData = await normalizeResults(rawResults);
+      // Process results based on mode
+      if (reportMode) {
+        // For Report Mode, we want 10 companies from each selected category
+        const normalizedData = {};
+        const processedResults = {};
+        
+        // Process each selected category
+        for (const category of selectedCategories) {
+          if (rawResults[category]) {
+            // Normalize this category
+            normalizedData[category] = await normalizeResults(rawResults[category]);
+            
+            // Process with fixed count of 10 for report mode
+            processedResults[category] = processResults(normalizedData[category], 10);
+          } else {
+            normalizedData[category] = [];
+            processedResults[category] = { items: [] };
+          }
+        }
+        
+        // Update categorized results
+        setCategorizedResults({
+          incumbent: selectedCategories.includes('incumbent') ? processedResults.incumbent.items || [] : [],
+          regional: selectedCategories.includes('regional') ? processedResults.regional.items || [] : [],
+          interesting: selectedCategories.includes('interesting') ? processedResults.interesting.items || [] : [],
+          graveyard: selectedCategories.includes('graveyard') ? processedResults.graveyard.items || [] : []
+        });
+        
+        // Set normalized results with categorized data
+        setNormalizedResults({
+          summary: processedResults[selectedCategories[0]]?.items || [],
+          modelResponseTimes: {}, // Calculate across selected categories
+          rawData: normalizedData,
+          categorized: true
+        });
+      } else {
+        // Standard mode normalization (existing logic)
+        const normalizedData = await normalizeResults(rawResults);
 
-      // Process each category with different limits
-      const processedIncumbent = processResults(normalizedData.incumbent, shortListCount);
-      const processedRegional = processResults(normalizedData.regional, 5); // Max 5 for regional
-      const processedInteresting = processResults(normalizedData.interesting, 3); // Max 3 for interesting
-      const processedGraveyard = processResults(normalizedData.graveyard, 3); // Max 3 for graveyard
+        // Process each category with different limits for standard mode
+        const processedIncumbent = processResults(normalizedData.incumbent, shortListCount);
+        const processedRegional = processResults(normalizedData.regional, 5); 
+        const processedInteresting = processResults(normalizedData.interesting, 3);
+        const processedGraveyard = processResults(normalizedData.graveyard, 3);
 
-      // Set the categorized results
-      setCategorizedResults({
-        incumbent: processedIncumbent.items || processedIncumbent,
-        regional: processedRegional.items || processedRegional,
-        interesting: processedInteresting.items || processedInteresting,
-        graveyard: processedGraveyard.items || processedGraveyard
-      });
+        setCategorizedResults({
+          incumbent: processedIncumbent.items || [],
+          regional: processedRegional.items || [],
+          interesting: processedInteresting.items || [],
+          graveyard: processedGraveyard.items || []
+        });
 
-      // Store the raw normalized data per category for potential detailed view or recalculation
-      const rawNormalizedCategorizedData = {
-        incumbent: normalizedData.incumbent,
-        regional: normalizedData.regional,
-        interesting: normalizedData.interesting,
-        graveyard: normalizedData.graveyard,
-      };
+        setNormalizedResults({
+          summary: processedIncumbent.items || processedIncumbent,
+          modelResponseTimes: processedIncumbent.modelResponseTimes || {},
+          rawData: normalizedData,
+          categorized: true
+        });
 
-      // TODO: Re-evaluate how metrics (precision/recall) should be calculated with categorized results
-      // For now, we'll just store the raw data and categorized results.
-      // We might need a way to define the control set per category or have a global one.
-      setLlmMetrics({}); // Reset metrics for now
+        // Calculate metrics only in test mode with control set
+        if (testMode && controlSet && controlSet.competitors.length > 0) {
+          // Normalize control set for comparison
+          const normalizedControlSet = await normalizeResults({
+            controlSet: {
+              items: controlSet.competitors,
+              category: 'control',
+              error: null
+            }
+          });
 
-      // Set normalized results (maybe rename this state later?)
-      setNormalizedResults({
-        // Keep summary pointing to incumbents for potential backward compatibility or default view
-        summary: processedIncumbent.items || processedIncumbent,
-        modelResponseTimes: processedIncumbent.modelResponseTimes || {}, // Or calculate across all?
-        rawData: rawNormalizedCategorizedData, // Store the categorized raw data
-        categorized: true // Flag to indicate we're using categorized results
-        // normalizedControlSet: normalizedControlSet // Control set logic needs update
-      });
+          // Calculate metrics for each model
+          const metrics = {};
+          const normalizedControlSetCompetitors = new Set(normalizedControlSet.controlSet.items);
 
+          Object.entries(normalizedData).forEach(([category, categoryData]) => {
+            Object.entries(categoryData).forEach(([model, modelData]) => {
+              if (!modelData || !modelData.items) return;
+
+              const modelItems = new Set(modelData.items);
+              let precisionMatches = 0;
+
+              modelItems.forEach(item => {
+                if (normalizedControlSetCompetitors.has(item)) {
+                  precisionMatches++;
+                }
+              });
+
+              const precision = modelItems.size > 0 
+                ? precisionMatches / modelItems.size
+                : 0;
+
+              let recallMatches = 0;
+
+              normalizedControlSetCompetitors.forEach(controlItem => {
+                if (modelItems.has(controlItem)) {
+                  recallMatches++;
+                }
+              });
+
+              const recall = normalizedControlSetCompetitors.size > 0
+                ? recallMatches / normalizedControlSetCompetitors.size
+                : 0;
+
+              // If this model already has metrics from another category, use the better values
+              if (metrics[model]) {
+                metrics[model] = {
+                  precision: Math.max(metrics[model].precision, Math.round(precision * 100)),
+                  recall: Math.max(metrics[model].recall, Math.round(recall * 100)),
+                  itemCount: Math.max(metrics[model].itemCount, modelItems.size),
+                  responseTime: metrics[model].responseTime
+                };
+              } else {
+                metrics[model] = {
+                  precision: Math.round(precision * 100),
+                  recall: Math.round(recall * 100),
+                  itemCount: modelItems.size,
+                  responseTime: modelData.responseTime || 0
+                };
+              }
+            });
+          });
+
+          setLlmMetrics(metrics);
+          
+          // Add normalized control set to normalized results
+          setNormalizedResults(prev => ({
+            ...prev,
+            normalizedControlSet: {
+              competitors: normalizedControlSet.controlSet.items
+            }
+          }));
+        }
+      }
     } catch (err) {
       setError(err.message || 'An error occurred during normalization');
     } finally {
@@ -307,7 +515,6 @@ function App() {
 
     // If we're in test mode and have a control set, use the evaluation metrics
     if (testMode && controlSet && normalizedResults && normalizedResults.normalizedControlSet && controlSet.competitors.length > 0) {
-
       const originalControlSetCompetitors = new Set(controlSet.competitors);
       const normalizedControlSetCompetitors = new Set(normalizedResults.normalizedControlSet.competitors);
 
@@ -327,12 +534,14 @@ function App() {
       // --- Recall Calculation (Checks normalized control set against *all* normalized found items) ---
       // Get all unique *normalized* items found by any LLM from rawData
       const allFoundNormalizedItems = new Set();
-      Object.values(normalizedResults.rawData).forEach(modelResult => {
-        if (modelResult && modelResult.items) {
-          modelResult.items.forEach(item => {
-            if (item) allFoundNormalizedItems.add(item.trim()); // These are already normalized
-          });
-        }
+      Object.values(normalizedResults.rawData).forEach(categoryData => {
+        Object.values(categoryData).forEach(modelData => {
+          if (modelData && modelData.items) {
+            modelData.items.forEach(item => {
+              if (item) allFoundNormalizedItems.add(item.trim()); // These are already normalized
+            });
+          }
+        });
       });
 
       // Count how many *normalized* control set competitors are in the *all found normalized* items list
@@ -354,16 +563,6 @@ function App() {
         precision: Math.round(precision * 100) + '%',
         recall: Math.round(recall * 100) + '%'
       };
-
-      console.log('Debug metrics calculation (Final Logic):', {
-        precisionMatches: precisionMatches,
-        shortlistLength: normalizedResults.summary.length,
-        recallMatches: recallMatches,
-        originalControlSetLength: originalControlSetCompetitors.size,
-        calculatedPrecision: precision,
-        calculatedRecall: recall,
-        formattedMetrics: metrics
-      });
     }
 
     // Save current company data
@@ -372,6 +571,7 @@ function App() {
       description: companyDescription,
       timestamp: new Date().toLocaleString(),
       testMode,
+      reportMode,
       metrics // Use the calculated metrics
     }]);
 
@@ -387,10 +587,15 @@ function App() {
     // Reset control set for new company
     setControlSet(null);
 
-    // Reset to default list counts
+    // Reset to default list counts and reset report mode settings if needed
     if (!testMode) {
       setLongListCount(20);
       setShortListCount(10);
+    }
+    
+    // Keep the report mode settings but reset the region if not needed
+    if (!reportMode || !selectedCategories.includes('regional')) {
+      setSelectedRegion('');
     }
 
     // Scroll to top of page
@@ -414,6 +619,15 @@ function App() {
       </header>
       
       <main>
+      {apiKeyStatus.checked && !apiKeyStatus.valid && (
+        <div className="api-key-warning">
+          <h3>⚠️ API Key Issue</h3>
+          <p>{apiKeyStatus.message || 'Your OpenRouter API key is missing or invalid.'}</p>
+          <p>Please set a valid REACT_APP_OPENROUTER_API_KEY in your environment.</p>
+          <p>Get a key from: <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">https://openrouter.ai/keys</a></p>
+        </div>
+      )}
+      
       <InputForm
         input={input}
         setInput={setInput}
@@ -427,8 +641,14 @@ function App() {
         setFastMode={setFastMode}
         testMode={testMode}
         setTestMode={setTestMode}
+        reportMode={reportMode}
+        setReportMode={setReportMode}
         selectedModels={selectedModels}
         setSelectedModels={setSelectedModels}
+        selectedRegion={selectedRegion}
+        setSelectedRegion={setSelectedRegion}
+        selectedCategories={selectedCategories}
+        setSelectedCategories={setSelectedCategories}
         onSubmit={handleSubmit}
         isLoading={isLoading}
       />
@@ -453,7 +673,7 @@ function App() {
               </div>
               <div className="normalization-text">
                 <h2>Raw Results Collected</h2>
-                <p>Data collected from {Object.keys(rawResults).length} LLMs. Click below to normalize and find the most common items.</p>
+                <p>Data collected from LLMs. Click below to normalize and find the most common items.</p>
               </div>
             </div>
             
@@ -590,7 +810,6 @@ function App() {
                         <th>Model</th>
                         <th>Precision</th>
                         <th>Recall</th>
-                        <th>Response Time</th>
                         <th>Items Found</th>
                       </tr>
                     </thead>
@@ -630,7 +849,6 @@ function App() {
                                 <span>{metrics.recall}%</span>
                               </div>
                             </td>
-                            <td>{metrics.responseTime}s</td>
                             <td>{metrics.itemCount}</td>
                           </tr>
                         ))}
@@ -686,8 +904,8 @@ function App() {
           </div>
         )}
         
-        {/* Only show ControlSetEvaluation in test mode */}
-        {testMode && normalizedResults && controlSet && (
+        {/* Only show ControlSetEvaluation in test mode and not in report mode */}
+        {testMode && !reportMode && normalizedResults && controlSet && (
           <ControlSetEvaluation controlSet={controlSet} normalizedResults={normalizedResults} />
         )}
 
@@ -713,7 +931,7 @@ function App() {
       </main>
       
       <footer className="app-footer">
-        <p>Powered by OpenRouter API • Using {selectedModels.length} different LLMs{testMode ? ' • Test Mode Active' : ''}</p>
+        <p>Powered by OpenRouter API • {reportMode ? 'Report Mode' : ''} Using {selectedModels.length} different LLMs{testMode && !reportMode ? ' • Test Mode Active' : ''}</p>
       </footer>
     </div>
   );

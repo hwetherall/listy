@@ -1,6 +1,9 @@
-// Get API key from environment variables
-const API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY;
-const BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
+// Import the custom environment variables
+import env from '../utils/customEnv';
+
+// Get API key and base URL from the custom env utility
+const API_KEY = env.OPENROUTER_API_KEY;
+const BASE_URL = env.OPENROUTER_BASE_URL;
 
 /**
  * Generate company description using OpenAI's GPT-4o model

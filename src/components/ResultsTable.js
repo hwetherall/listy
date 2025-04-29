@@ -2,52 +2,70 @@ import React, { useState } from 'react';
 import RawResultsTable from './RawResultsTable';
 import TabView from './TabView';
 
-// New component to display model response times
-function ModelResponseTimes({ responseTimes }) {
-  if (!responseTimes || Object.keys(responseTimes).length === 0) {
-    return null;
+// CategoryTable component for displaying a table of results for a specific category
+function CategoryTable({ results, maxFrequency }) {
+  if (!results || results.length === 0) {
+    return (
+      <div className="empty-category-message">
+        No results available for this category.
+      </div>
+    );
   }
-
-  // Flatten the nested structure to get all response times
-  const allResponseTimes = {};
-  
-  // Process each category
-  Object.values(responseTimes).forEach(categoryData => {
-    // Process each model in the category
-    Object.entries(categoryData).forEach(([model, modelData]) => {
-      if (modelData && modelData.responseTime) {
-        allResponseTimes[model] = modelData.responseTime;
-      }
-    });
-  });
-  
-  if (Object.keys(allResponseTimes).length === 0) {
-    return null;
-  }
-
-  // Sort models by response time (fastest first)
-  const sortedModels = Object.entries(allResponseTimes)
-    .sort(([, timeA], [, timeB]) => parseFloat(timeA) - parseFloat(timeB));
-
-  // Helper function to get provider name from model
-  const getProviderName = (model) => {
-    if (!model) return '';
-    const parts = model.split('/');
-    return parts[0]; // Get just the provider name
-  };
 
   return (
-    <div className="response-times-section">
-      <h3>Model Response Times (Fastest to Slowest)</h3>
-      <div className="response-times-grid">
-        {sortedModels.map(([model, time]) => (
-          <div key={model} className="response-time-item">
-            <div className="provider-badge">{getProviderName(model)}</div>
-            <span className="model-name">{model}</span>
-            <span className="time-badge">{time}s</span>
-          </div>
-        ))}
-      </div>
+    <div className="table-container summary-table-container">
+      <table className="results-table">
+        <thead>
+          <tr>
+            <th>Rank</th>
+            <th>Competitor</th>
+            <th>Frequency</th>
+            <th>LLM Sources</th>
+          </tr>
+        </thead>
+        <tbody>
+          {results.map((row, index) => (
+            <tr key={row.rank || index + 1}>
+              <td>{row.rank || index + 1}</td>
+              <td>
+                <div className="item-cell">
+                  <span className="item-name">{row.item}</span>
+                  {(row.rank <= 3 || index < 3) && (
+                    <span className={`rank-badge rank-${row.rank || index + 1}`}>
+                      {(row.rank === 1 || index === 0) && '🥇'}
+                      {(row.rank === 2 || index === 1) && '🥈'}
+                      {(row.rank === 3 || index === 2) && '🥉'}
+                    </span>
+                  )}
+                </div>
+              </td>
+              <td>
+                <div className="frequency-cell">
+                  <span className="frequency-value">{row.frequency}</span>
+                  <div className="frequency-bar-container">
+                    <div 
+                      className="frequency-bar"
+                      style={{ 
+                        width: `${(row.frequency / maxFrequency) * 100}%`,
+                        opacity: 0.6 + 0.4 * (row.frequency / maxFrequency)
+                      }}
+                    />
+                  </div>
+                </div>
+              </td>
+              <td>
+                <div className="provider-tags">
+                  {row.providers && row.providers.map(provider => (
+                    <span key={provider} className={`provider-tag ${provider}`}>
+                      {provider}
+                    </span>
+                  ))}
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -55,252 +73,289 @@ function ModelResponseTimes({ responseTimes }) {
 function ResultsTable({ 
   categorizedResults, 
   normalizedRawResults,
-  categoryInfo
+  categoryInfo = {
+    incumbent: { label: 'Incumbents', icon: '🏢', shortListCount: 10 },
+    regional: { label: 'Regional Players', icon: '🌎', shortListCount: 5 },
+    interesting: { label: 'Interesting Cases', icon: '💡', shortListCount: 3 },
+    graveyard: { label: 'Graveyard', icon: '⚰️', shortListCount: 3 }
+  }
 }) {
   const [copySuccess, setCopySuccess] = useState(false);
   const [viewMode, setViewMode] = useState('summary'); // 'summary' or 'detailed'
+  const [activeCategory, setActiveCategory] = useState('incumbent');
   
   // Category icons and styling
   const categories = {
     incumbent: { 
-      label: 'Incumbents', 
-      icon: '🏢', 
-      count: categorizedResults.incumbent?.length || 0,
-      shortListCount: 10
+      label: categoryInfo.incumbent?.label || 'Incumbents', 
+      icon: categoryInfo.incumbent?.icon || '🏢', 
+      count: Array.isArray(categorizedResults.incumbent) ? categorizedResults.incumbent.length : 0,
+      shortListCount: categoryInfo.incumbent?.shortListCount || 10
     },
     regional: { 
-      label: 'Regional Players', 
-      icon: '🌎', 
-      count: categorizedResults.regional?.length || 0,
-      shortListCount: 5
+      label: categoryInfo.regional?.label || 'Regional Players', 
+      icon: categoryInfo.regional?.icon || '🌎', 
+      count: Array.isArray(categorizedResults.regional) ? categorizedResults.regional.length : 0,
+      shortListCount: categoryInfo.regional?.shortListCount || 5
     },
     interesting: { 
-      label: 'Interesting Cases', 
-      icon: '💡', 
-      count: categorizedResults.interesting?.length || 0,
-      shortListCount: 3
+      label: categoryInfo.interesting?.label || 'Interesting Cases', 
+      icon: categoryInfo.interesting?.icon || '💡', 
+      count: Array.isArray(categorizedResults.interesting) ? categorizedResults.interesting.length : 0,
+      shortListCount: categoryInfo.interesting?.shortListCount || 3
     },
     graveyard: { 
-      label: 'Graveyard', 
-      icon: '⚰️', 
-      count: categorizedResults.graveyard?.length || 0,
-      shortListCount: 3
+      label: categoryInfo.graveyard?.label || 'Graveyard', 
+      icon: categoryInfo.graveyard?.icon || '⚰️', 
+      count: Array.isArray(categorizedResults.graveyard) ? categorizedResults.graveyard.length : 0,
+      shortListCount: categoryInfo.graveyard?.shortListCount || 3
     }
   };
 
+  // Calculate max frequency for each category
+  const maxFrequencies = {
+    incumbent: Array.isArray(categorizedResults.incumbent) && categorizedResults.incumbent.length > 0 
+      ? categorizedResults.incumbent[0].frequency : 1,
+    regional: Array.isArray(categorizedResults.regional) && categorizedResults.regional.length > 0 
+      ? categorizedResults.regional[0].frequency : 1,
+    interesting: Array.isArray(categorizedResults.interesting) && categorizedResults.interesting.length > 0 
+      ? categorizedResults.interesting[0].frequency : 1,
+    graveyard: Array.isArray(categorizedResults.graveyard) && categorizedResults.graveyard.length > 0 
+      ? categorizedResults.graveyard[0].frequency : 1
+  };
+
   // Get model response times from results if available
-  const modelResponseTimes = normalizedRawResults ? 
-    Object.entries(normalizedRawResults)
-      .reduce((acc, [model, data]) => {
-        if (data.responseTime) {
-          acc[model] = data.responseTime;
-        }
-        return acc;
-      }, {}) 
-    : {};
+  const modelResponseTimes = normalizedRawResults ? normalizedRawResults : {};
 
   const handleCopyToClipboard = (category) => {
-    // Implementation to copy the current category's data to clipboard
-    // ...similar to the existing implementation
+    // Get the active category results
+    const results = categorizedResults[category];
+    if (!results || results.length === 0) {
+      return;
+    }
+
+    // Format the results as a simple text list
+    const text = results.map(item => `${item.rank || ''} ${item.item} (${item.frequency})`).join('\n');
+    
+    // Copy to clipboard
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err);
+        alert('Failed to copy to clipboard');
+      });
+  };
+
+  // Handle tab change
+  const handleTabChange = (category) => {
+    setActiveCategory(category);
+  };
+
+  // Get description based on category
+  const getCategoryDescription = (category) => {
+    switch(category) {
+      case 'incumbent':
+        return 'Established, large players that directly compete with the target company';
+      case 'regional':
+        return 'Companies that operate primarily in specific geographic regions';
+      case 'interesting':
+        return 'Innovative companies with novel business models or technologies';
+      case 'graveyard':
+        return 'Former competitors that are no longer active threats';
+      default:
+        return '';
+    }
   };
 
   return (
     <div className="results-container">
-      <TabView categories={categories}>
-        {/* Incumbent Tab */}
-        <div className="category-tab incumbent-tab">
-          <div className="category-header">
-            <h2>Incumbent Competitors</h2>
-            <p className="category-description">
-              Established, large players that directly compete with the target company
-            </p>
-          </div>
-          
-          {/* View toggle and other controls... */}
-          
-          {/* Table for incumbent competitors */}
-          <div className="table-container summary-table-container">
-            <table className="results-table">
-              <thead>
-                <tr>
-                  <th>Rank</th>
-                  <th>Competitor</th>
-                  <th>Frequency</th>
-                  <th>LLM Sources</th>
-                </tr>
-              </thead>
-              <tbody>
-                {categorizedResults.incumbent?.map((row) => (
-                  <tr key={row.rank}>
-                    <td>{row.rank}</td>
-                    <td>
-                      <div className="item-cell">
-                        <span className="item-name">{row.item}</span>
-                        {row.rank <= 3 && (
-                          <span className={`rank-badge rank-${row.rank}`}>
-                            {row.rank === 1 && '🥇'}
-                            {row.rank === 2 && '🥈'}
-                            {row.rank === 3 && '🥉'}
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="frequency-cell">
-                        <span className="frequency-value">{row.frequency}</span>
-                        <div className="frequency-bar-container">
-                          <div 
-                            className="frequency-bar"
-                            style={{ 
-                              width: `${(row.frequency / categorizedResults.incumbent[0].frequency) * 100}%`,
-                              opacity: 0.6 + 0.4 * (row.frequency / categorizedResults.incumbent[0].frequency)
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <div className="provider-tags">
-                        {row.providers.map(provider => (
-                          <span key={provider} className={`provider-tag ${provider}`}>
-                            {provider}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Regional Tab */}
-        <div className="category-tab regional-tab">
-          {/* Similar structure as above but for regional competitors */}
-        </div>
-
-        {/* Interesting Tab */}
-        <div className="category-tab interesting-tab">
-          {/* Similar structure as above but for interesting competitors */}
-        </div>
-
-        {/* Graveyard Tab */}
-        <div className="category-tab graveyard-tab">
-          {/* Similar structure as above but for graveyard competitors */}
-        </div>
-      </TabView>
-      
-      {/* Display response times section if we have any */}
-      {Object.keys(modelResponseTimes).length > 0 && (
-        <ModelResponseTimes responseTimes={modelResponseTimes} />
-      )}
-      
-      <div className="view-toggle-container">
-        <button 
-          className={`view-toggle-button ${viewMode === 'summary' ? 'active' : ''}`}
-          onClick={() => setViewMode('summary')}
-        >
-          Summary View
-        </button>
-        <button 
-          className={`view-toggle-button ${viewMode === 'detailed' ? 'active' : ''}`}
-          onClick={() => setViewMode('detailed')}
-        >
-          Detailed View
-        </button>
+      <div className="results-header">
+        <h2>Competitor Analysis Results</h2>
       </div>
       
-      <div className="results-actions">
-        <button
-          className={`copy-button ${copySuccess ? 'success' : ''}`}
-          onClick={() => handleCopyToClipboard('incumbent')}
-        >
-          {copySuccess ? (
-            <>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-              Copied to clipboard!
-            </>
-          ) : (
-            <>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-              </svg>
-              Copy to clipboard
-            </>
-          )}
-        </button>
+      <div className="category-tabs">
+        {Object.entries(categories).map(([key, category]) => (
+          Array.isArray(categorizedResults[key]) && categorizedResults[key].length > 0 && (
+            <button 
+              key={key}
+              className={`category-tab-button ${activeCategory === key ? 'active' : ''}`}
+              onClick={() => handleTabChange(key)}
+            >
+              <span className="category-icon">{category.icon}</span>
+              <span className="category-label">{category.label}</span>
+              <span className="category-count">{category.count}</span>
+            </button>
+          )
+        ))}
       </div>
       
-      {viewMode === 'summary' ? (
-        <div className="table-container summary-table-container">
-          <table className="results-table">
-            <thead>
-              <tr>
-                <th>Rank</th>
-                <th>Competitor</th>
-                <th>Frequency</th>
-                <th>LLM Sources</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categorizedResults.incumbent?.map((row) => (
-                <tr key={row.rank}>
-                  <td>{row.rank}</td>
-                  <td>
-                    <div className="item-cell">
-                      <span className="item-name">{row.item}</span>
-                      {row.rank <= 3 && (
-                        <span className={`rank-badge rank-${row.rank}`}>
-                          {row.rank === 1 && '🥇'}
-                          {row.rank === 2 && '🥈'}
-                          {row.rank === 3 && '🥉'}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="frequency-cell">
-                      <span className="frequency-value">{row.frequency}</span>
-                      <div className="frequency-bar-container">
-                        <div 
-                          className="frequency-bar"
-                          style={{ 
-                            width: `${(row.frequency / categorizedResults.incumbent[0].frequency) * 100}%`,
-                            opacity: 0.6 + 0.4 * (row.frequency / categorizedResults.incumbent[0].frequency)
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </td>
-                  <td>
-                    <div className="provider-tags">
-                      {row.providers.map(provider => (
-                        <span key={provider} className={`provider-tag ${provider}`}>
-                          {provider}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="active-category-container">
+        <div className="category-header">
+          <h3>{categories[activeCategory]?.label || 'Results'}</h3>
+          <p className="category-description">
+            {getCategoryDescription(activeCategory)}
+          </p>
         </div>
-      ) : (
-        <div className="table-container detailed-table-container">
-          <RawResultsTable normalizedResults={normalizedRawResults} />
+        
+        <div className="results-actions">
+          <button
+            className={`copy-button ${copySuccess ? 'success' : ''}`}
+            onClick={() => handleCopyToClipboard(activeCategory)}
+          >
+            {copySuccess ? (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                Copied to clipboard!
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copy to clipboard
+              </>
+            )}
+          </button>
+          
+          <div className="view-toggle-container">
+            <button 
+              className={`view-toggle-button ${viewMode === 'summary' ? 'active' : ''}`}
+              onClick={() => setViewMode('summary')}
+            >
+              Summary View
+            </button>
+            <button 
+              className={`view-toggle-button ${viewMode === 'detailed' ? 'active' : ''}`}
+              onClick={() => setViewMode('detailed')}
+            >
+              Detailed View
+            </button>
+          </div>
         </div>
-      )}
+        
+        {viewMode === 'summary' ? (
+          <CategoryTable 
+            results={categorizedResults[activeCategory]} 
+            maxFrequency={maxFrequencies[activeCategory]} 
+          />
+        ) : (
+          <div className="table-container detailed-table-container">
+            <RawResultsTable 
+              normalizedResults={normalizedRawResults[activeCategory] || {}} 
+              category={activeCategory}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-// Add these styles to your main.css
+// Additional styles for new UI components
 const additionalStyles = `
+.results-container {
+  margin-top: var(--space-6);
+}
+
+.results-header {
+  margin-bottom: var(--space-6);
+}
+
+.category-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--neutral-200);
+  padding-bottom: var(--space-2);
+}
+
+.category-tab-button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  background-color: var(--neutral-100);
+  border: 1px solid var(--neutral-200);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.category-tab-button:hover {
+  background-color: var(--neutral-200);
+}
+
+.category-tab-button.active {
+  background-color: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+.category-icon {
+  font-size: 1.2rem;
+}
+
+.category-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background-color: var(--neutral-200);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.category-tab-button.active .category-count {
+  background-color: white;
+  color: var(--primary);
+}
+
+.active-category-container {
+  background-color: white;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--neutral-200);
+  padding: var(--space-4);
+  margin-bottom: var(--space-6);
+}
+
+.category-header {
+  margin-bottom: var(--space-4);
+}
+
+.category-header h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.category-description {
+  color: var(--neutral-600);
+  margin-top: var(--space-1);
+  margin-bottom: 0;
+}
+
+.results-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.empty-category-message {
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--neutral-600);
+  font-style: italic;
+}
+
 .results-subtitle {
   color: var(--neutral-600);
   margin-top: -0.5rem;
@@ -395,10 +450,8 @@ const additionalStyles = `
   margin-top: auto;
 }
 
-/* Add these if needed */
 .view-toggle-container {
   display: flex;
-  margin-bottom: var(--space-4);
 }
 
 .view-toggle-button {
@@ -406,7 +459,6 @@ const additionalStyles = `
   border: 1px solid var(--neutral-300);
   background-color: var(--neutral-100);
   cursor: pointer;
-  flex: 1;
   text-align: center;
 }
 
