@@ -27,24 +27,97 @@ export const LLM_MODELS = [
   const API_KEY = process.env.REACT_APP_OPENROUTER_API_KEY;
   const BASE_URL = 'https://openrouter.ai/api/v1/chat/completions';
   
-  /**
-   * Generate prompt for competitor list creation
-   */
-  const generateCompetitorPrompt = (companyName, companyDescription, longListCount) => {
-    return `You are a competitive intelligence expert specializing in market research. Your task is to generate a list of ${longListCount} companies that directly compete with "${companyName}".
-  
-  Additional company context: ${companyDescription}
-  
-  Please follow these guidelines:
-  1. Only include companies that offer similar products or services to ${companyName}. Product/service similarity is the PRIMARY criterion.
-  2. Return exactly ${longListCount} distinct competitors, no more and no less.
-  3. Format your response as a numbered list (1., 2., 3., etc.)
-  4. List ONLY the company name (e.g., "Uber" not "Uber - a ridesharing app based in North America").
-  5. Include both established companies and emerging startups if relevant.
-  6. DO NOT include duplicates, subsidiaries of the same parent company, or different branches of the same company.
-  7. Only provide the list - do not include explanations, introductions, or conclusions.
-  
-  Your list of ${longListCount} competitors to "${companyName}":`;
+  // New prompt generators for specialized competitor categories with refinements
+
+  const generateIncumbentPrompt = (companyName, companyDescription, count) => {
+    return `You are a competitive intelligence expert specializing in market research. Your task is to generate a list of up to ${count} INCUMBENT companies that directly compete with "${companyName}".
+
+Additional company context: ${companyDescription}
+
+For INCUMBENTS, focus on:
+1. Established, large players in the same market as ${companyName}
+2. Well-known, primary competitors with significant market share
+3. Companies whose core products/services directly compete with ${companyName}'s offerings and target overlapping customer segments // Refined for clarity on directness and customer overlap
+
+Please follow these guidelines:
+1. List up to ${count} distinct incumbent competitors
+2. Format your response as a numbered list (1., 2., 3., etc.)
+3. List ONLY the company name (e.g., "Uber" not "Uber - a ridesharing app")
+4. Only include true direct competitors, not partners or suppliers
+5. Only provide the list - no explanations or introductions
+
+Your list of incumbent competitors to "${companyName}":`;
+  };
+
+  const generateRegionalPrompt = (companyName, companyDescription, count) => {
+    // Note: This version assumes the AI should *infer* the region from the description.
+    // If you can pass the region(s) explicitly, modify this function to accept and use them.
+    return `You are a competitive intelligence expert focusing on regional market analysis. For the company "${companyName}", identify up to ${count} REGION-SPECIFIC competitors.
+
+Additional company context: ${companyDescription}
+
+// Added instruction for AI to infer region from context
+Based on the provided company context, infer the primary geographic operating region(s) of ${companyName}. Focus your search for competitors primarily active within those specific regions.
+
+For REGIONAL PLAYERS, focus on:
+1. Companies that operate primarily in specific geographic regions rather than globally
+2. Local alternatives to ${companyName} within specific geographic markets // Refined for clarity
+3. Region-specific competitors with strong local presence
+4. Companies that may be large in their region but less known globally
+
+Please follow these guidelines:
+1. List up to ${count} distinct regional competitors
+2. Format your response as a numbered list (1., 2., 3., etc.)
+3. List ONLY the company name (e.g., "Grab" not "Grab - Southeast Asian ride-hailing")
+4. Only provide the list - no explanations or introductions
+
+Your list of regional competitors to "${companyName}":`;
+  };
+
+  const generateInterestingPrompt = (companyName, companyDescription, count) => {
+    return `You are a competitive intelligence expert focusing on unique business models and market dynamics. For the company "${companyName}", identify up to ${count} INTERESTING competitors.
+
+Additional company context: ${companyDescription}
+
+// Added clarification on the *purpose* of this list
+The goal is to identify competitors that represent novel threats, innovative strategies, or market shifts relevant to ${companyName}.
+
+For INTERESTING CASES, focus on:
+1. Companies tackling the same customer problem as ${companyName} but with significantly innovative or disruptive technology, business models, or value propositions // Refined for specificity
+2. Large, established companies from adjacent industries that are actively entering or exploring ${companyName}'s market space // Refined for clarity on activity level
+3. Startups with novel technologies or business models challenging incumbents
+4. Companies that pivoted into this space from different industries
+
+Please follow these guidelines:
+1. List up to ${count} distinct interesting competitors
+2. Format your response as a numbered list (1., 2., 3., etc.)
+3. List ONLY the company name (e.g., "Tortoise" not "Tortoise - autonomous repositioning scooters")
+4. Only provide the list - no explanations or introductions
+
+Your list of interesting competitors to "${companyName}":`;
+  };
+
+  const generateGraveyardPrompt = (companyName, companyDescription, count) => {
+    return `You are a competitive intelligence expert focusing on market history. For the company "${companyName}", identify up to ${count} FORMER competitors.
+
+Additional company context: ${companyDescription}
+
+// Refined main instruction to clarify "former direct competitors"
+Identify up to ${count} companies that *were previously* significant direct competitors to ${companyName} but are no longer active threats in their original form.
+
+For GRAVEYARD cases, focus on:
+1. Companies in this specific market that went bankrupt or ceased operations // Refined for market specificity
+2. Competitors that were acquired by larger players (and potentially absorbed/discontinued)
+3. Companies that previously competed directly but pivoted their core business away from this market // Refined for pivot context
+4. Once-prominent players in this market that have significantly declined or become negligible competitors
+
+Please follow these guidelines:
+1. List up to ${count} distinct former competitors
+2. Format your response as a numbered list (1., 2., 3., etc.)
+3. List ONLY the company name (e.g., "Spin" not "Spin - acquired by Tier in 2023")
+4. Only provide the list - no explanations or introductions
+
+Your list of former competitors to "${companyName}":`;
   };
   
   /**
@@ -134,7 +207,7 @@ export const LLM_MODELS = [
   };
   
   /**
-   * Query all LLMs in parallel
+   * Query all LLMs in parallel for multiple competitor categories
    */
   export const queryLLMs = async (
     companyName, 
@@ -144,60 +217,115 @@ export const LLM_MODELS = [
     fastMode = false,
     customModels = null
   ) => {
-    const prompt = generateCompetitorPrompt(companyName, companyDescription, longListCount);
+    // Generate prompts for each category
+    const incumbentPrompt = generateIncumbentPrompt(companyName, companyDescription, longListCount);
+    const regionalPrompt = generateRegionalPrompt(companyName, companyDescription, 10);
+    const interestingPrompt = generateInterestingPrompt(companyName, companyDescription, 10);
+    const graveyardPrompt = generateGraveyardPrompt(companyName, companyDescription, 10);
   
     // Determine which models to use
     let selectedModels;
     
     if (customModels && customModels.length > 0) {
-      // Use custom models if provided
       selectedModels = customModels;
     } else if (fastMode) {
-      // Fall back to fast mode if no custom models
       selectedModels = FAST_MODE_LLMS;
     } else {
-      // Default to all models
       selectedModels = LLM_MODELS;
     }
     
-    // Make requests to selected LLMs in parallel
-    const promises = selectedModels.map(model => 
-      queryLLM(model, prompt, updateProgress)
+    // Make requests to all LLMs for all categories in parallel
+    const incumbentPromises = selectedModels.map(model => 
+      queryLLM(model, incumbentPrompt, (status, responseTime) => {
+        updateProgress(model, status, responseTime, 'incumbent');
+      })
+    );
+
+    const regionalPromises = selectedModels.map(model => 
+      queryLLM(model, regionalPrompt, (status, responseTime) => {
+        updateProgress(model, status, responseTime, 'regional');
+      })
+    );
+
+    const interestingPromises = selectedModels.map(model => 
+      queryLLM(model, interestingPrompt, (status, responseTime) => {
+        updateProgress(model, status, responseTime, 'interesting');
+      })
+    );
+
+    const graveyardPromises = selectedModels.map(model => 
+      queryLLM(model, graveyardPrompt, (status, responseTime) => {
+        updateProgress(model, status, responseTime, 'graveyard');
+      })
     );
     
-    const responses = await Promise.all(promises);
+    // Wait for all promises to resolve
+    const [incumbentResponses, regionalResponses, interestingResponses, graveyardResponses] = 
+      await Promise.all([
+        Promise.all(incumbentPromises),
+        Promise.all(regionalPromises),
+        Promise.all(interestingPromises),
+        Promise.all(graveyardPromises)
+      ]);
     
-    // Process responses
-    const results = {};
-    let successCount = 0;
-    
-    responses.forEach(response => {
-      const { model, content, error, responseTime } = response;
+    // Process all responses by category
+    const processCategory = (responses, category) => {
+      const results = {};
+      let successCount = 0;
       
-      if (content) {
-        const items = parseNumberedList(content);
-        results[model] = {
-          items,
-          error: items.length < longListCount ? 
-            `Expected ${longListCount} items but got ${items.length}` : 
-            null,
-          responseTime
-        };
-        successCount++;
-      } else {
-        results[model] = {
-          items: [],
-          error,
-          responseTime: responseTime || 0
-        };
-      }
-    });
+      responses.forEach((response, index) => {
+        const { model, content, error, responseTime } = response;
+        
+        if (content) {
+          const items = parseNumberedList(content);
+          results[model] = {
+            items,
+            category,
+            error: null,
+            responseTime,
+          };
+          successCount++;
+        } else {
+          results[model] = {
+            items: [],
+            category,
+            error,
+            responseTime: responseTime || 0
+          };
+        }
+      });
+      
+      return { results, successCount };
+    };
     
-    if (successCount === 0) {
+    const { results: incumbentResults, successCount: incumbentSuccess } = 
+      processCategory(incumbentResponses, 'incumbent');
+
+    const { results: regionalResults, successCount: regionalSuccess } = 
+      processCategory(regionalResponses, 'regional');
+
+    const { results: interestingResults, successCount: interestingSuccess } = 
+      processCategory(interestingResponses, 'interesting');
+
+    const { results: graveyardResults, successCount: graveyardSuccess } = 
+      processCategory(graveyardResponses, 'graveyard');
+
+    // Combine all results
+    const combinedResults = {
+      incumbent: incumbentResults,
+      regional: regionalResults,
+      interesting: interestingResults,
+      graveyard: graveyardResults
+    };
+    
+    // Ensure at least some responses were successful
+    const totalSuccessCount = incumbentSuccess + regionalSuccess + interestingSuccess + graveyardSuccess;
+
+    if (totalSuccessCount === 0) {
       throw new Error('Failed to get valid responses from any LLM. Please check your API key and try again.');
     }
     
-    console.log('LLM responses:', Object.keys(results));
+    console.log('LLM responses received for all categories');
     
-    return results;
+    return combinedResults;
   };
