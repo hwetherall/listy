@@ -137,10 +137,10 @@ Your list of former competitors to "${companyName}":`;
   /**
    * Query a single LLM model
    */
-  const queryLLM = async (model, prompt, updateProgress) => {
+  const queryLLM = async (model, prompt, updateProgress, category = '') => {
     try {
-      // Update progress status
-      updateProgress(model, 'requesting');
+      // Update progress status with category if provided
+      updateProgress(model, 'requesting', 0, category);
       
       // Start timing
       const startTime = Date.now();
@@ -177,7 +177,7 @@ Your list of former competitors to "${companyName}":`;
       if (!data.choices || data.choices.length === 0 || !data.choices[0].message || !data.choices[0].message.content) {
         const errorMessage = `Invalid response structure from ${model}: Missing expected content.`;
         console.error(`Error querying ${model}:`, errorMessage, data); // Log the actual data received
-        updateProgress(model, 'error', responseTime);
+        updateProgress(model, 'error', responseTime, category);
         return {
           model,
           error: errorMessage,
@@ -186,7 +186,7 @@ Your list of former competitors to "${companyName}":`;
         };
       }
 
-      updateProgress(model, 'success', responseTime);
+      updateProgress(model, 'success', responseTime, category);
       
       return {
         model,
@@ -195,7 +195,9 @@ Your list of former competitors to "${companyName}":`;
       };
     } catch (error) {
       console.error(`Error querying ${model}:`, error);
-      updateProgress(model, 'error');
+      // Try to get responseTime even in error, although it might be 0
+      const responseTimeOnError = (error.responseTime !== undefined) ? error.responseTime : 0;
+      updateProgress(model, 'error', responseTimeOnError, category);
       
       return {
         model,

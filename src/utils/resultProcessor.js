@@ -17,22 +17,25 @@ export const processResults = (normalizedResults, shortListCount) => {
     // Track model response times
     const modelResponseTimes = {};
     
-    Object.entries(normalizedResults).forEach(([model, result]) => {
+    Object.entries(normalizedResults).forEach(([model, modelData]) => {
       const provider = getProviderName(model);
       
       // Store response time if available
-      if (result.responseTime) {
-        modelResponseTimes[model] = result.responseTime;
+      if (modelData.responseTime) {
+        modelResponseTimes[model] = modelData.responseTime;
       }
       
-      result.items.forEach(item => {
-        if (item && item.trim()) {
-          allItems.push({
-            item: item.trim(),
-            provider
-          });
-        }
-      });
+      // Ensure modelData.items exists before trying to iterate over it
+      if (modelData && modelData.items) {
+        modelData.items.forEach(item => {
+          if (item && item.trim()) {
+            allItems.push({
+              item: item.trim(),
+              provider
+            });
+          }
+        });
+      }
     });
     
     // Count frequency of each item and track which providers included it
@@ -50,33 +53,41 @@ export const processResults = (normalizedResults, shortListCount) => {
       frequencyMap[item].providers.add(provider);
     });
     
-    // Sort items by frequency (descending) and select top N
-    const sortedItems = Object.entries(frequencyMap)
-      .map(([item, { count, providers }]) => ({
-        item,
-        frequency: count,
-        providers: Array.from(providers).sort()
-      }))
-      .sort((a, b) => {
-        // Primary sort by frequency
-        const freqDiff = b.frequency - a.frequency;
-        if (freqDiff !== 0) return freqDiff;
-        
-        // Secondary sort by number of providers (more providers is better)
-        const providerDiff = b.providers.length - a.providers.length;
-        if (providerDiff !== 0) return providerDiff;
-        
-        // Tertiary sort alphabetically
-        return a.item.localeCompare(b.item);
-      })
-      .slice(0, shortListCount);
+    // Convert to array for sorting
+    const sortedItems = Object.entries(frequencyMap).map(([item, { count, providers }]) => ({
+      item,
+      count,
+      providers: Array.from(providers)
+    }));
     
-    // Add rank and return object with items and response times
+    // Sort by frequency (descending) and secondarily by alphabetical order
+    sortedItems.sort((a, b) => {
+      if (a.count !== b.count) {
+        return b.count - a.count; // Higher count first
+      }
+      // Same count, sort alphabetically
+      return a.item.localeCompare(b.item);
+    });
+    
+    // Take only the specified number of items (or all if fewer)
+    const topItems = sortedItems.slice(0, shortListCount);
+    
     return {
-      items: sortedItems.map((entry, index) => ({
-        rank: index + 1,
-        ...entry
-      })),
+      items: topItems,
       modelResponseTimes
     };
-  };
+};
+
+export const processCategorizedResults = (normalizedResults, categoryLimits) => {
+  const result = {};
+  
+  // Process each category with its own limit
+  Object.entries(normalizedResults).forEach(([category, data]) => {
+    // Ensure data is an object before passing to processResults
+    const categoryData = typeof data === 'object' && data !== null ? data : {};
+    const limit = categoryLimits[category] || 10; // Default to 10 if no limit specified
+    result[category] = processResults(categoryData, limit);
+  });
+  
+  return result;
+};

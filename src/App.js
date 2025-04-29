@@ -35,6 +35,14 @@ function App() {
   const [recalculatedResults, setRecalculatedResults] = useState(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
 
+  // Add new state in App.js
+  const [categorizedResults, setCategorizedResults] = useState({
+    incumbent: [],
+    regional: [],
+    interesting: [],
+    graveyard: []
+  });
+
   // Effect to update list counts when control set changes and test mode is active
   useEffect(() => {
     if (testMode && controlSet && controlSet.competitors && controlSet.competitors.length > 0) {
@@ -108,90 +116,46 @@ function App() {
     setError(null);
     
     try {
-      // Create a combined data object that includes both LLM results and control set
-      let combinedResults = { ...rawResults };
-      
-      // Add control set as a separate "model" if it exists and we're in test mode
-      if (testMode && controlSet && controlSet.competitors && controlSet.competitors.length > 0) {
-        combinedResults['control_set'] = {
-          items: controlSet.competitors,
-          type: 'control_set'
-        };
-      }
-      
-      // Normalize all data together
-      const normalizedData = await normalizeResults(combinedResults);
-      
-      // Get the normalized control set items if they exist
-      const normalizedControlSet = normalizedData['control_set'] 
-        ? {
-            ...controlSet,
-            competitors: normalizedData['control_set'].items,
-            originalCompetitors: controlSet.competitors
-          }
-        : controlSet;
-      
-      // Remove control set from normalized data before processing
-      if (normalizedData['control_set']) {
-        delete normalizedData['control_set'];
-      }
-      
-      const processed = processResults(normalizedData, shortListCount);
-      
-      // Calculate precision and recall metrics per LLM model if in test mode
-      if (testMode && normalizedControlSet && normalizedControlSet.competitors && normalizedControlSet.competitors.length > 0) {
-        const modelMetrics = {};
-        const normalizedControlSetCompetitors = new Set(normalizedControlSet.competitors);
-        
-        // For each LLM model
-        Object.entries(normalizedData).forEach(([model, modelData]) => {
-          if (!modelData || !modelData.items) return;
-          
-          // Precision: How many of this model's items are in the control set
-          const modelItems = new Set(modelData.items);
-          let precisionMatches = 0;
-          
-          modelItems.forEach(item => {
-            if (normalizedControlSetCompetitors.has(item)) {
-              precisionMatches++;
-            }
-          });
-          
-          const precision = modelItems.size > 0 
-            ? precisionMatches / modelItems.size
-            : 0;
-          
-          // Recall: How many of the control set items were found by this model
-          let recallMatches = 0;
-          
-          normalizedControlSetCompetitors.forEach(controlItem => {
-            if (modelItems.has(controlItem)) {
-              recallMatches++;
-            }
-          });
-          
-          const recall = normalizedControlSetCompetitors.size > 0
-            ? recallMatches / normalizedControlSetCompetitors.size
-            : 0;
-          
-          // Store metrics for this model
-          modelMetrics[model] = {
-            precision: Math.round(precision * 100),
-            recall: Math.round(recall * 100),
-            itemCount: modelItems.size,
-            responseTime: modelData.responseTime || 0
-          };
-        });
-        
-        setLlmMetrics(modelMetrics);
-      }
-      
-      setNormalizedResults({
-        summary: processed.items || processed, // Handle both new object format and old array format
-        modelResponseTimes: processed.modelResponseTimes || {},
-        rawData: normalizedData,
-        normalizedControlSet: normalizedControlSet
+      // First normalize all results together to identify duplicates across categories
+      const normalizedData = await normalizeResults(rawResults);
+
+      // Process each category with different limits
+      const processedIncumbent = processResults(normalizedData.incumbent, shortListCount);
+      const processedRegional = processResults(normalizedData.regional, 5); // Max 5 for regional
+      const processedInteresting = processResults(normalizedData.interesting, 3); // Max 3 for interesting
+      const processedGraveyard = processResults(normalizedData.graveyard, 3); // Max 3 for graveyard
+
+      // Set the categorized results
+      setCategorizedResults({
+        incumbent: processedIncumbent.items || processedIncumbent,
+        regional: processedRegional.items || processedRegional,
+        interesting: processedInteresting.items || processedInteresting,
+        graveyard: processedGraveyard.items || processedGraveyard
       });
+
+      // Store the raw normalized data per category for potential detailed view or recalculation
+      const rawNormalizedCategorizedData = {
+        incumbent: normalizedData.incumbent,
+        regional: normalizedData.regional,
+        interesting: normalizedData.interesting,
+        graveyard: normalizedData.graveyard,
+      };
+
+      // TODO: Re-evaluate how metrics (precision/recall) should be calculated with categorized results
+      // For now, we'll just store the raw data and categorized results.
+      // We might need a way to define the control set per category or have a global one.
+      setLlmMetrics({}); // Reset metrics for now
+
+      // Set normalized results (maybe rename this state later?)
+      setNormalizedResults({
+        // Keep summary pointing to incumbents for potential backward compatibility or default view
+        summary: processedIncumbent.items || processedIncumbent,
+        modelResponseTimes: processedIncumbent.modelResponseTimes || {}, // Or calculate across all?
+        rawData: rawNormalizedCategorizedData, // Store the categorized raw data
+        categorized: true // Flag to indicate we're using categorized results
+        // normalizedControlSet: normalizedControlSet // Control set logic needs update
+      });
+
     } catch (err) {
       setError(err.message || 'An error occurred during normalization');
     } finally {
@@ -523,7 +487,16 @@ function App() {
         )}
         
         {normalizedResults && (
-          <ResultsTable summaryResults={normalizedResults.summary} normalizedRawResults={normalizedResults.rawData} />
+          <ResultsTable 
+            categorizedResults={categorizedResults} 
+            normalizedRawResults={normalizedResults.rawData} // Pass the categorized raw data
+            categoryInfo={{
+              incumbent: { label: 'Incumbents', icon: '🏢', shortListCount: shortListCount },
+              regional: { label: 'Regional Players', icon: '🌎', shortListCount: 5 },
+              interesting: { label: 'Interesting Cases', icon: '💡', shortListCount: 3 },
+              graveyard: { label: 'Graveyard', icon: '⚰️', shortListCount: 3 }
+            }}
+          />
         )}
 
         {/* Recalculated Results */}
@@ -548,7 +521,10 @@ function App() {
               )}
             </div>
             
-            <ResultsTable summaryResults={recalculatedResults.summary} normalizedRawResults={recalculatedResults.rawData} />
+            <ResultsTable 
+              categorizedResults={recalculatedResults.categorizedSummary} // Need to update recalculation logic
+              normalizedRawResults={recalculatedResults.rawData} // Pass the categorized raw data
+            />
           </div>
         )}
 

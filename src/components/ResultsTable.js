@@ -8,8 +8,25 @@ function ModelResponseTimes({ responseTimes }) {
     return null;
   }
 
+  // Flatten the nested structure to get all response times
+  const allResponseTimes = {};
+  
+  // Process each category
+  Object.values(responseTimes).forEach(categoryData => {
+    // Process each model in the category
+    Object.entries(categoryData).forEach(([model, modelData]) => {
+      if (modelData && modelData.responseTime) {
+        allResponseTimes[model] = modelData.responseTime;
+      }
+    });
+  });
+  
+  if (Object.keys(allResponseTimes).length === 0) {
+    return null;
+  }
+
   // Sort models by response time (fastest first)
-  const sortedModels = Object.entries(responseTimes)
+  const sortedModels = Object.entries(allResponseTimes)
     .sort(([, timeA], [, timeB]) => parseFloat(timeA) - parseFloat(timeB));
 
   // Helper function to get provider name from model

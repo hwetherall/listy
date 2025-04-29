@@ -64,14 +64,26 @@ const extractJsonFromResponse = (content) => {
  * Normalize the results using the Normalizer LLM
  */
 export const normalizeResults = async (results) => {
-  // Combine all items from all LLMs into a single list
-  const allItems = Object.values(results)
-    .flatMap(result => result.items)
-    .filter(item => item && item.trim()) // Remove any null, undefined, or empty items
-    .map(item => item.trim());
+  // Extract items from the nested structure of results
+  // The results have a format: { incumbent: { modelName: { items: [...] } }, regional: {...}, ... }
+  const allItems = [];
+  
+  // Process each category
+  Object.values(results).forEach(categoryData => {
+    // Process each model within the category
+    Object.values(categoryData).forEach(modelData => {
+      if (modelData && modelData.items) {
+        // Add each item from this model to the combined list
+        modelData.items.forEach(item => {
+          if (item && item.trim()) {
+            allItems.push(item.trim());
+          }
+        });
+      }
+    });
+  });
   
   // Remove duplicates for the normalization prompt
-  // (we'll normalize the full list later)
   const uniqueItems = [...new Set(allItems)];
   
   if (uniqueItems.length === 0) {
@@ -126,17 +138,23 @@ export const normalizeResults = async (results) => {
     // Log the parsed normalization map
     console.log("Parsed Normalization Map:", normalizationMap);
 
-    // Apply normalization to all results
+    // Apply normalization to all results, maintaining the nested structure
     const normalizedResults = {};
     
-    Object.entries(results).forEach(([model, result]) => {
-      normalizedResults[model] = {
-        ...result,
-        // Map each item to its normalized form, or keep as is if not in the map
-        items: result.items.map(item => 
-          item ? (normalizationMap[item.trim()] || item) : item
-        )
-      };
+    // Process each category
+    Object.entries(results).forEach(([category, categoryData]) => {
+      normalizedResults[category] = {};
+      
+      // Process each model within the category
+      Object.entries(categoryData).forEach(([model, modelData]) => {
+        normalizedResults[category][model] = {
+          ...modelData,
+          // Map each item to its normalized form, or keep as is if not in the map
+          items: modelData.items.map(item => 
+            item ? (normalizationMap[item.trim()] || item) : item
+          )
+        };
+      });
     });
     
     return normalizedResults;
